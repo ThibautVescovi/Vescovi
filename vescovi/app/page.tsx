@@ -1,26 +1,25 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { supabaseClient } from '@/lib/supabaseClient'
 
 export default function Home() {
-    const [name, setName] = useState('Invité')
+    const router = useRouter()
 
     useEffect(() => {
-        const fetchUser = async () => {
-            const { data: users, error } = await supabase
-                .from('users')
-                .select('name')
-                .limit(1)
-
-            if (users && users.length > 0) {
-                setName(users[0].name)
+        supabaseClient.auth.getSession().then(({ data }) => {
+            if (data.session) {
+                router.replace('/dashboard')
             } else {
-                console.log('Erreur Supabase:', error)
+                router.replace('/login')
             }
-        }
-        fetchUser()
-    }, [])
+        })
+    }, [router])
 
-    return <h1>Bonjour {name} 👋</h1>
+    return (
+        <div className="flex items-center justify-center min-h-screen">
+            <p>Chargement...</p>
+        </div>
+    )
 }
