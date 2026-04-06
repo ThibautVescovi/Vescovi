@@ -1,6 +1,6 @@
 // proxy.ts
-import { createServerClient } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
+import {createServerClient} from '@supabase/ssr'
+import {NextResponse, type NextRequest} from 'next/server'
 
 export async function proxy(req: NextRequest) {
     let res = NextResponse.next()
@@ -24,11 +24,15 @@ export async function proxy(req: NextRequest) {
     )
 
     const {
-        data: { session },
+        data: {session},
     } = await supabase.auth.getSession()
 
     const isAuthPage = req.nextUrl.pathname.startsWith('/login')
 
+// ⚠️ IMPORTANT : skip si session inconnue (évite flicker)
+    if (!session && !req.cookies.get('sb-access-token')) {
+        return res
+    }
     if (!session && !isAuthPage) {
         return NextResponse.redirect(new URL('/login', req.url))
     }
