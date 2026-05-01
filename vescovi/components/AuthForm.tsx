@@ -1,9 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabaseClient } from '@/lib/supabaseClient'
 
 export default function AuthForm() {
+    const router = useRouter()
     const [isLogin, setIsLogin] = useState(true)
 
     const [email, setEmail] = useState('')
@@ -20,7 +22,11 @@ export default function AuthForm() {
                 email,
                 password,
             })
-            if (error) setMessage(error.message)
+            if (error) {
+                setMessage(error.message)
+            } else {
+                router.replace('/home')
+            }
         } else {
             const { error } = await supabaseClient.auth.signUp({
                 email,
@@ -50,7 +56,7 @@ export default function AuthForm() {
                         placeholder="Prénom"
                         value={firstName}
                         onChange={(e) => setFirstName(e.target.value)}
-                        className="border p-2 rounded text-black"
+                        className="w-full border p-3 rounded text-black"
                     />
 
                     <input
@@ -58,7 +64,7 @@ export default function AuthForm() {
                         placeholder="Nom"
                         value={lastName}
                         onChange={(e) => setLastName(e.target.value)}
-                        className="border p-2 rounded text-black"
+                        className="w-full border p-3 rounded text-black"
                     />
                 </>
             )}
@@ -68,7 +74,7 @@ export default function AuthForm() {
                 placeholder="Email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="border p-2 rounded text-black"
+                className="w-full border p-3 rounded text-black"
             />
 
             <input
@@ -76,12 +82,12 @@ export default function AuthForm() {
                 placeholder="Mot de passe"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="border p-2 rounded text-black"
+                className="w-full border p-3 rounded text-black"
             />
 
             <button
                 type="submit"
-                className="bg-green-600 text-white p-2 rounded"
+                className="w-full bg-green-600 text-white p-3 rounded"
             >
                 {isLogin ? 'Se connecter' : "S'inscrire"}
             </button>

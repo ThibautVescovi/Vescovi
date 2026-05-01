@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="com.obiscr.chatgpt.settings.EasyCodeState">
+    <option name="projectFiles" value="$PROJECT_DIR$/vescovi/app/(auth)/login/page.tsx;E:/Workspace/Vescovi.fr/Vescovi/vescovi/app/(routes)/home/page.tsx;E:/Workspace/Vescovi.fr/Vescovi/vescovi/app/(routes)/layout.tsx;E:/Workspace/Vescovi.fr/Vescovi/vescovi/app/(routes)/navbar.tsx;E:/Workspace/Vescovi.fr/Vescovi/vescovi/app/(routes)/page.tsx;E:/Workspace/Vescovi.fr/Vescovi/vescovi/app/globals.css;E:/Workspace/Vescovi.fr/Vescovi/vescovi/app/layout.tsx;E:/Workspace/Vescovi.fr/Vescovi/vescovi/components/AuthForm.tsx;E:/Workspace/Vescovi.fr/Vescovi/vescovi/lib/supabaseClient.ts;E:/Workspace/Vescovi.fr/Vescovi/vescovi/lib/supabaseServer.ts;E:/Workspace/Vescovi.fr/Vescovi/vescovi/AGENTS.md;E:/Workspace/Vescovi.fr/Vescovi/vescovi/CLAUDE.md;E:/Workspace/Vescovi.fr/Vescovi/vescovi/next.config.ts;E:/Workspace/Vescovi.fr/Vescovi/vescovi/package-lock.json;E:/Workspace/Vescovi.fr/Vescovi/vescovi/package.json;E:/Workspace/Vescovi.fr/Vescovi/vescovi/proxy.ts;E:/Workspace/Vescovi.fr/Vescovi/vescovi/README.md;E:/Workspace/Vescovi.fr/Vescovi/vescovi/tsconfig.json" />
+  </component>
+</project>

@@ -1,45 +1,50 @@
-'use client'
-
-import {useEffect} from 'react'
-import {useRouter} from 'next/navigation'
-import {supabaseClient} from '@/lib/supabaseClient'
+import {redirect} from 'next/navigation'
 import AuthForm from '@/components/AuthForm'
+import {createClient} from '@/lib/supabaseServer'
 
-export default function LoginPage() {
-    const router = useRouter()
+export default async function LoginPage() {
+    const supabase = await createClient()
+    const {
+        data: { user },
+    } = await supabase.auth.getUser()
 
-    useEffect(() => {
-        // check session au chargement
-        supabaseClient.auth.getSession().then(({data}) => {
-            if (data.session) {
-                router.push('/home')
-            }
-        })
-
-        // écoute changement login/logout
-        const {data: listener} = supabaseClient.auth.onAuthStateChange(
-            (_event, session) => {
-                if (session) {
-                    router.push('/home')
-                }
-            }
-        )
-
-        return () => {
-            listener.subscription.unsubscribe()
-        }
-    }, [router])
+    if (user) {
+        redirect('/home')
+    }
 
     return (
         <div
-            className="relative min-h-screen flex items-center justify-center bg-cover bg-center"
-            style={{ backgroundImage: "url('/bg-login.webp')" }}
+            className="relative min-h-screen bg-cover bg-center flex items-center justify-center px-4 py-8"
+            style={{backgroundImage: "url('/bg-login.webp')"}}
         >
+            {/* Overlay */}
             <div className="absolute inset-0 bg-black/50"></div>
 
-            <div className="relative bg-white/90 text-black p-6 rounded-xl shadow-md w-full max-w-md">
-                <h1 className="text-xl font-semibold mb-4">Connexion</h1>
-                <AuthForm />
+            {/* Card */}
+            <div
+                className="
+        relative
+        w-full
+        max-w-md
+        rounded-2xl
+        bg-white/90
+        backdrop-blur-md
+        p-6
+        sm:p-8
+        shadow-2xl
+        text-black
+      "
+            >
+                <img
+                    src="/logo.png"
+                    alt="Vescovi"
+                    className="h-24 w-auto mx-auto mb-2 scale-150 sm:h-28"
+                />
+                <h1 className="text-2xl font-bold mb-6 text-center">
+                    Connexion
+                </h1>
+
+                <AuthForm/>
             </div>
         </div>
     )

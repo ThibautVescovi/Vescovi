@@ -3,7 +3,7 @@ import {createServerClient} from '@supabase/ssr'
 import {NextResponse, type NextRequest} from 'next/server'
 
 export async function proxy(req: NextRequest) {
-    let res = NextResponse.next()
+    const res = NextResponse.next()
 
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,20 +24,16 @@ export async function proxy(req: NextRequest) {
     )
 
     const {
-        data: {session},
-    } = await supabase.auth.getSession()
+        data: {user},
+    } = await supabase.auth.getUser()
 
     const isAuthPage = req.nextUrl.pathname.startsWith('/login')
 
-// ⚠️ IMPORTANT : skip si session inconnue (évite flicker)
-    if (!session && !req.cookies.get('sb-access-token')) {
-        return res
-    }
-    if (!session && !isAuthPage) {
+    if (!user && !isAuthPage) {
         return NextResponse.redirect(new URL('/login', req.url))
     }
 
-    if (session && isAuthPage) {
+    if (user && isAuthPage) {
         return NextResponse.redirect(new URL('/', req.url))
     }
 
@@ -45,5 +41,5 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-    matcher: ['/', '/profile', '/team', '/ranking'],
+    matcher: ['/', '/home', '/profile', '/team', '/ranking', '/login'],
 }

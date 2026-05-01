@@ -1,3 +1,4 @@
+// app/page.tsx (Home)
 export default function HomePage() {
     return (
         <div className="min-h-[calc(100vh-80px)] flex flex-col items-center justify-center relative overflow-hidden">
