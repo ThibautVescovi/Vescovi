@@ -15,6 +15,26 @@ type TeamPlayerRow = {
     position: string;
 };
 
+type PlayerPerformanceRow = {
+    player_id: string;
+    match_id: string;
+    goals: number | null;
+    played_full_match: boolean | null;
+    is_starter: boolean | null;
+    is_substitute_in: boolean | null;
+    yellow_cards: number | null;
+    red_cards: number | null;
+    goals_conceded: number | null;
+};
+
+type MatchRow = {
+    id: string;
+    team_home: string;
+    team_away: string;
+    match_date: string | null;
+    stage: string | null;
+};
+
 const slotPositions: Record<string, { x: number; y: number; position: Position }> = {
     "gk-1": { x: 50, y: 8, position: "Gardien" },
     "def-1": { x: 20, y: 30, position: "Défenseur" },
@@ -90,14 +110,118 @@ function getPositionColor(position: Position): string {
     }
 }
 
+const alpha3ToAlpha2: Record<string, string> = {
+    ARG: "AR",
+    AUS: "AU",
+    AUT: "AT",
+    BEL: "BE",
+    BRA: "BR",
+    CAN: "CA",
+    CHE: "CH",
+    CHL: "CL",
+    CIV: "CI",
+    CMR: "CM",
+    COL: "CO",
+    CRI: "CR",
+    CZE: "CZ",
+    DEU: "DE",
+    DNK: "DK",
+    ECU: "EC",
+    EGY: "EG",
+    ESP: "ES",
+    FRA: "FR",
+    GBR: "GB",
+    GHA: "GH",
+    HRV: "HR",
+    HUN: "HU",
+    IRN: "IR",
+    IRQ: "IQ",
+    ISL: "IS",
+    ITA: "IT",
+    JPN: "JP",
+    KOR: "KR",
+    MAR: "MA",
+    MEX: "MX",
+    NED: "NL",
+    NLD: "NL",
+    NGA: "NG",
+    NOR: "NO",
+    NZL: "NZ",
+    POL: "PL",
+    PRT: "PT",
+    ROU: "RO",
+    SAU: "SA",
+    SCO: "GB",
+    SEN: "SN",
+    SRB: "RS",
+    SWE: "SE",
+    TUR: "TR",
+    UKR: "UA",
+    URY: "UY",
+    USA: "US",
+    VEN: "VE",
+    WAL: "GB",
+};
 
 function getCountryFlag(countryCode: string): string {
-    if (!countryCode || countryCode.length !== 2) return "🌍";
-    const codePoints = countryCode
-        .toUpperCase()
+    if (!countryCode) return "🌍";
+
+    const normalized = countryCode.trim().toUpperCase();
+    const iso2 =
+        normalized.length === 2
+            ? normalized
+            : normalized.length === 3
+              ? alpha3ToAlpha2[normalized]
+              : undefined;
+
+    if (!iso2 || !/^[A-Z]{2}$/.test(iso2)) return "🌍";
+
+    const codePoints = iso2
         .split("")
         .map((char) => 127397 + char.charCodeAt(0));
     return String.fromCodePoint(...codePoints);
+}
+
+function getAppearancePoints(row: Pick<PlayerPerformanceRow, "played_full_match" | "is_starter" | "is_substitute_in">): number {
+    if (row.played_full_match) {
+        return 2;
+    }
+
+    if (row.is_starter || row.is_substitute_in) {
+        return 1;
+    }
+
+    return 0;
+}
+
+function computePlayerMatchPoints(position: Position, row: PlayerPerformanceRow): number {
+    const goals = Math.max(0, row.goals ?? 0);
+    const goalsConceded = Math.max(0, row.goals_conceded ?? 0);
+    const yellowCards = Math.max(0, row.yellow_cards ?? 0);
+    const redCards = Math.max(0, row.red_cards ?? 0);
+
+    const goalPoints = goals * 5;
+    const appearancePoints = getAppearancePoints(row);
+    const cardPoints = yellowCards * -2 + redCards * -5;
+
+    let defensivePoints = 0;
+    const hasPlayed = appearancePoints > 0;
+
+    if (position === "Gardien") {
+        defensivePoints += hasPlayed && goalsConceded === 0 ? 5 : 0;
+        defensivePoints -= goalsConceded;
+    }
+
+    if (position === "Défenseur") {
+        defensivePoints += hasPlayed && goalsConceded === 0 ? 2 : 0;
+        defensivePoints -= goalsConceded;
+    }
+
+    return goalPoints + appearancePoints + cardPoints + defensivePoints;
+}
+
+function formatPoints(value: number): string {
+    return value > 0 ? `+${value}` : `${value}`;
 }
 
 export default async function ViewTeamPage() {
@@ -276,6 +400,120 @@ export default async function ViewTeamPage() {
         })
         .filter((p): p is NonNullable<typeof p> => p !== null);
 
+    const teamPlayerIds = teamPlayers11.map((player) => player.id);
+    const { data: playerPerformancesData, error: playerPerformancesError } = await supabase
+        .from("player_performances")
+        .select(
+            "player_id,match_id,goals,played_full_match,is_starter,is_substitute_in,yellow_cards,red_cards,goals_conceded",
+        )
+        .in("player_id", teamPlayerIds);
+
+    if (playerPerformancesError) {
+        return (
+            <div className="min-h-[calc(100vh-80px)] bg-[linear-gradient(180deg,#052e16_0%,#0f3d2e_48%,#111827_100%)] px-4 py-8 text-white sm:px-6 lg:px-8">
+                <div className="mx-auto max-w-2xl text-center">
+                    <p className="text-sm font-bold uppercase tracking-[0.24em] text-yellow-200">
+                        Erreur
+                    </p>
+                    <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">
+                        Erreur de chargement
+                    </h1>
+                    <p className="mt-3 text-base leading-7 text-red-200">{playerPerformancesError.message}</p>
+                </div>
+            </div>
+        );
+    }
+
+    const playerPerformances = (playerPerformancesData ?? []) as PlayerPerformanceRow[];
+    const matchIds = Array.from(new Set(playerPerformances.map((row) => row.match_id)));
+
+    const { data: matchesData, error: matchesError } = matchIds.length
+        ? await supabase
+              .from("matches")
+              .select("id, team_home, team_away, match_date, stage")
+              .in("id", matchIds)
+        : { data: [], error: null };
+
+    if (matchesError) {
+        return (
+            <div className="min-h-[calc(100vh-80px)] bg-[linear-gradient(180deg,#052e16_0%,#0f3d2e_48%,#111827_100%)] px-4 py-8 text-white sm:px-6 lg:px-8">
+                <div className="mx-auto max-w-2xl text-center">
+                    <p className="text-sm font-bold uppercase tracking-[0.24em] text-yellow-200">
+                        Erreur
+                    </p>
+                    <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">
+                        Erreur de chargement
+                    </h1>
+                    <p className="mt-3 text-base leading-7 text-red-200">{matchesError.message}</p>
+                </div>
+            </div>
+        );
+    }
+
+    const matches = ((matchesData ?? []) as MatchRow[]).sort((a, b) => {
+        const aTime = a.match_date ? new Date(a.match_date).getTime() : 0;
+        const bTime = b.match_date ? new Date(b.match_date).getTime() : 0;
+        return aTime - bTime;
+    });
+
+    const positionOrder: Position[] = ["Gardien", "Défenseur", "Milieu", "Attaquant"];
+    const positionByPlayerId = new Map(teamPlayers11.map((player) => [player.id, player.position]));
+    const pointsByPlayerId = new Map(
+        teamPlayers11.map((player) => [
+            player.id,
+            {
+                total: 0,
+                byMatch: {} as Record<string, number>,
+            },
+        ]),
+    );
+
+    for (const performance of playerPerformances) {
+        const position = positionByPlayerId.get(performance.player_id);
+
+        if (!position) {
+            continue;
+        }
+
+        const points = computePlayerMatchPoints(position, performance);
+        const current = pointsByPlayerId.get(performance.player_id);
+
+        if (!current) {
+            continue;
+        }
+
+        current.total += points;
+        current.byMatch[performance.match_id] = (current.byMatch[performance.match_id] ?? 0) + points;
+    }
+
+    const teamPointsRows = [...teamPlayers11]
+        .sort((a, b) => {
+            const byPosition = positionOrder.indexOf(a.position) - positionOrder.indexOf(b.position);
+            if (byPosition !== 0) {
+                return byPosition;
+            }
+
+            return a.name.localeCompare(b.name, "fr");
+        })
+        .map((player) => {
+            const points = pointsByPlayerId.get(player.id) ?? { total: 0, byMatch: {} };
+
+            return {
+                id: player.id,
+                name: player.name,
+                position: player.position,
+                total: points.total,
+                byMatch: points.byMatch,
+            };
+        });
+
+    const totalByMatch = matches.reduce<Record<string, number>>((acc, match) => {
+        acc[match.id] = teamPointsRows.reduce((sum, row) => sum + (row.byMatch[match.id] ?? 0), 0);
+        return acc;
+    }, {});
+
+    const teamTotalPoints = teamPointsRows.reduce((sum, row) => sum + row.total, 0);
+
     return (
         <div className="min-h-[calc(100vh-80px)] bg-[linear-gradient(180deg,#052e16_0%,#0f3d2e_48%,#111827_100%)] px-4 py-8 text-white sm:px-6 lg:px-8">
             <div className="mx-auto max-w-7xl">
@@ -291,9 +529,9 @@ export default async function ViewTeamPage() {
                     </p>
                 </div>
 
-                <div className="grid gap-6 lg:grid-cols-[1fr_350px]">
+                <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
                     {/* Terrain de foot */}
-                    <div className="relative w-full max-w-md mx-auto lg:max-w-none aspect-[2/3] rounded-lg border-4 border-white bg-gradient-to-b from-green-600 to-green-700 p-4 shadow-2xl shadow-black/50">
+                    <div className="relative mx-auto aspect-[3/4] w-full max-w-[430px] rounded-lg border-4 border-white bg-gradient-to-b from-green-600 to-green-700 p-4 shadow-2xl shadow-black/50 sm:max-w-[500px] lg:max-w-[580px]">
                         {/* Ligne médiane */}
                         <div className="absolute left-1/2 top-0 bottom-0 w-1 -translate-x-1/2 bg-white opacity-40" />
 
@@ -301,11 +539,11 @@ export default async function ViewTeamPage() {
                         <div className="absolute left-1/2 top-1/2 h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white opacity-40" />
 
                         {/* Zones de but */}
-                        <div className="absolute left-4 top-2 h-16 w-24 border-2 border-white opacity-40" />
-                        <div className="absolute left-4 top-6 h-8 w-16 border-2 border-white opacity-40" />
+                        <div className="absolute left-1/2 top-[2%] h-[16%] w-[46%] -translate-x-1/2 border-2 border-white opacity-40" />
+                        <div className="absolute left-1/2 top-[2%] h-[8%] w-[24%] -translate-x-1/2 border-2 border-white opacity-40" />
 
-                        <div className="absolute right-4 bottom-2 h-16 w-24 border-2 border-white opacity-40" />
-                        <div className="absolute right-4 bottom-6 h-8 w-16 border-2 border-white opacity-40" />
+                        <div className="absolute bottom-[2%] left-1/2 h-[16%] w-[46%] -translate-x-1/2 border-2 border-white opacity-40" />
+                        <div className="absolute bottom-[2%] left-1/2 h-[8%] w-[24%] -translate-x-1/2 border-2 border-white opacity-40" />
 
                         {/* Joueurs */}
                         <div className="relative h-full w-full">
@@ -336,7 +574,7 @@ export default async function ViewTeamPage() {
                     </div>
 
                     {/* Panneau latéral */}
-                    <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+                    <div className="space-y-4 xl:sticky xl:top-24 xl:self-start">
                         {/* Résumé de l'équipe */}
                         <div className="rounded-lg border border-white/15 bg-white/10 p-5 shadow-xl shadow-black/20">
                             <h2 className="text-xl font-black">Composition</h2>
@@ -398,8 +636,87 @@ export default async function ViewTeamPage() {
                         </Link>
                     </div>
                 </div>
+
+                <div className="mt-8 rounded-lg border border-white/15 bg-white/10 p-5 shadow-xl shadow-black/20">
+                    <h2 className="text-xl font-black">Points par joueur et par match</h2>
+                    {matches.length === 0 ? (
+                        <p className="mt-3 text-sm text-emerald-50/80">
+                            Aucun match noté pour le moment.
+                        </p>
+                    ) : (
+                        <div className="mt-4 overflow-x-auto">
+                            <table className="min-w-full divide-y divide-white/10 text-xs sm:text-sm">
+                                <thead>
+                                    <tr className="text-left text-emerald-50/80">
+                                        <th className="sticky left-0 z-10 bg-emerald-950/80 px-3 py-2">Joueur</th>
+                                        <th className="px-3 py-2">Poste</th>
+                                        {matches.map((match) => (
+                                            <th key={match.id} className="min-w-[120px] px-2 py-2 text-center sm:min-w-[140px] sm:px-3">
+                                                <div className="font-semibold text-white">
+                                                    {match.team_home} - {match.team_away}
+                                                </div>
+                                                <div className="text-xs text-emerald-50/70">
+                                                    {match.match_date
+                                                        ? new Intl.DateTimeFormat("fr-FR", {
+                                                              day: "2-digit",
+                                                              month: "2-digit",
+                                                          }).format(new Date(match.match_date))
+                                                        : "Date inconnue"}
+                                                </div>
+                                            </th>
+                                        ))}
+                                        <th className="px-3 py-2 text-right">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/10">
+                                    {teamPointsRows.map((row) => (
+                                        <tr key={row.id}>
+                                            <td className="sticky left-0 z-10 bg-emerald-950/70 px-3 py-2 font-semibold">
+                                                {row.name}
+                                            </td>
+                                            <td className="px-3 py-2 text-emerald-50/80">{row.position}</td>
+                                            {matches.map((match) => {
+                                                const matchPoints = row.byMatch[match.id] ?? 0;
+                                                const pointsColor =
+                                                    matchPoints > 0
+                                                        ? "text-emerald-300"
+                                                        : matchPoints < 0
+                                                          ? "text-red-300"
+                                                          : "text-emerald-50/70";
+
+                                                return (
+                                                    <td key={`${row.id}-${match.id}`} className={`px-2 py-2 text-center font-semibold sm:px-3 ${pointsColor}`}>
+                                                        {formatPoints(matchPoints)}
+                                                    </td>
+                                                );
+                                            })}
+                                            <td className="px-3 py-2 text-right font-black text-yellow-300">
+                                                {formatPoints(row.total)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                <tfoot>
+                                    <tr className="border-t border-white/20 bg-emerald-950/40">
+                                        <td className="sticky left-0 z-10 bg-emerald-950/80 px-3 py-2 font-black text-yellow-300">
+                                            Total match
+                                        </td>
+                                        <td className="px-3 py-2 text-emerald-50/70">Equipe</td>
+                                        {matches.map((match) => (
+                                            <td key={`total-${match.id}`} className="px-2 py-2 text-center font-black text-yellow-300 sm:px-3">
+                                                {formatPoints(totalByMatch[match.id] ?? 0)}
+                                            </td>
+                                        ))}
+                                        <td className="px-3 py-2 text-right font-black text-yellow-300">
+                                            {formatPoints(teamTotalPoints)}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
 }
-
