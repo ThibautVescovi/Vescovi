@@ -5,8 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { supabaseClient } from "@/lib/supabaseClient";
 
 const navItems = [
-    { label: "Profil", href: "/profile", icon: "FC" },
-    { label: "Mon équipe", href: "/team", icon: "XI" },
+    { label: "Voir mon équipe", href: "/view-team", icon: "MT" },
+    { label: "Créer mon équipe", href: "/team", icon: "XI" },
     { label: "Classement", href: "/ranking", icon: "#1" },
 ];
 

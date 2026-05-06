@@ -42,7 +42,7 @@ export default function AuthForm() {
             if (error) {
                 setMessage(error.message)
             } else {
-                setMessage('Vérifie ton email 📩')
+                setMessage('Tu peux maintenant te connecter avec tes identifiants !')
             }
         }
     }
@@ -87,7 +87,7 @@ export default function AuthForm() {
 
             <button
                 type="submit"
-                className="w-full bg-green-600 text-white p-3 rounded"
+                className="w-full bg-green-600 text-white p-3 rounded cursor-pointer hover:bg-green-700 transition"
             >
                 {isLogin ? 'Se connecter' : "S'inscrire"}
             </button>
