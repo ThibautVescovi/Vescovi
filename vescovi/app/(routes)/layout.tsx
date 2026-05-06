@@ -2,6 +2,7 @@ import '../globals.css'
 import Navbar from './navbar'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabaseServer'
+import { isAdminRole } from '@/lib/authz'
 
 
 export default async function AppLayout({children}: { children: React.ReactNode }) {
@@ -14,9 +15,17 @@ export default async function AppLayout({children}: { children: React.ReactNode 
         redirect('/login')
     }
 
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle()
+
+    const canAccessAdmin = isAdminRole(profile?.role)
+
     return (
         <div className="bg-green-900 text-white min-h-screen">
-            <Navbar/>
+            <Navbar canAccessAdmin={canAccessAdmin}/>
             <main>{children}</main>
         </div>
     )

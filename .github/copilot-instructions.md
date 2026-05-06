@@ -28,3 +28,116 @@ Joueur carton jaune : -2 points
 Joueur carton rouge : -5 points
 
 
+Mon schéma de base de données est le suivant :
+
+## Table `countries`
+
+### Columns
+
+| Name | Type | Constraints |
+|------|------|-------------|
+| `code` | `text` | Primary |
+| `name` | `text` |  |
+
+## Table `entries`
+
+### Columns
+
+| Name | Type | Constraints |
+|------|------|-------------|
+| `id` | `uuid` | Primary |
+| `user_id` | `uuid` |  |
+| `team_id` | `uuid` |  |
+| `wine_name` | `text` |  |
+| `created_at` | `timestamp` |  Nullable |
+
+## Table `matches`
+
+### Columns
+
+| Name | Type | Constraints |
+|------|------|-------------|
+| `id` | `uuid` | Primary |
+| `team_home` | `text` |  |
+| `team_away` | `text` |  |
+| `home_score` | `int4` |  Nullable |
+| `away_score` | `int4` |  Nullable |
+| `match_date` | `timestamp` |  Nullable |
+| `stage` | `text` |  Nullable |
+
+## Table `player_performances`
+
+### Columns
+
+| Name | Type | Constraints |
+|------|------|-------------|
+| `id` | `uuid` | Primary |
+| `player_id` | `uuid` |  |
+| `match_id` | `uuid` |  |
+| `goals` | `int4` |  Nullable |
+| `played_full_match` | `bool` |  Nullable |
+| `is_starter` | `bool` |  Nullable |
+| `is_substitute_in` | `bool` |  Nullable |
+| `yellow_cards` | `int4` |  Nullable |
+| `red_cards` | `int4` |  Nullable |
+| `goals_conceded` | `int4` |  Nullable |
+
+## Table `players`
+
+### Columns
+
+| Name | Type | Constraints |
+|------|------|-------------|
+| `id` | `uuid` | Primary |
+| `name` | `text` |  |
+| `country_code` | `text` |  |
+| `position` | `text` |  |
+
+## Table `profiles`
+
+### Columns
+
+| Name | Type | Constraints |
+|------|------|-------------|
+| `id` | `uuid` | Primary |
+| `created_at` | `timestamp` |  Nullable |
+| `first_name` | `text` |  Nullable |
+| `last_name` | `text` |  Nullable |
+| `role` | `user_role` |  |
+
+## Table `team_changes`
+
+### Columns
+
+| Name | Type | Constraints |
+|------|------|-------------|
+| `id` | `uuid` | Primary |
+| `team_id` | `uuid` |  |
+| `player_out_id` | `uuid` |  Nullable |
+| `player_in_id` | `uuid` |  Nullable |
+| `created_at` | `timestamp` |  Nullable |
+
+## Table `team_players`
+
+### Columns
+
+| Name | Type | Constraints |
+|------|------|-------------|
+| `id` | `uuid` | Primary |
+| `team_id` | `uuid` |  |
+| `player_id` | `uuid` |  |
+| `position` | `text` |  |
+| `is_active` | `bool` |  Nullable |
+
+## Table `teams`
+
+### Columns
+
+| Name | Type | Constraints |
+|------|------|-------------|
+| `id` | `uuid` | Primary |
+| `user_id` | `uuid` |  |
+| `name` | `text` |  |
+| `total_points` | `int4` |  Nullable |
+| `created_at` | `timestamp` |  Nullable |
+
