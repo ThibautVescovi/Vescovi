@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabaseServer";
+import * as Flags from "country-flag-icons/react/3x2";
+import { hasFlag } from "country-flag-icons";
 
 type Position = "Gardien" | "Défenseur" | "Milieu" | "Attaquant";
 
@@ -111,61 +113,148 @@ function getPositionColor(position: Position): string {
 }
 
 const alpha3ToAlpha2: Record<string, string> = {
-    ARG: "AR",
-    AUS: "AU",
-    AUT: "AT",
-    BEL: "BE",
-    BRA: "BR",
-    CAN: "CA",
-    CHE: "CH",
-    CHL: "CL",
-    CIV: "CI",
-    CMR: "CM",
-    COL: "CO",
-    CRI: "CR",
-    CZE: "CZ",
-    DEU: "DE",
-    DNK: "DK",
-    ECU: "EC",
-    EGY: "EG",
-    ESP: "ES",
-    FRA: "FR",
-    GBR: "GB",
-    GHA: "GH",
-    HRV: "HR",
-    HUN: "HU",
-    IRN: "IR",
-    IRQ: "IQ",
-    ISL: "IS",
-    ITA: "IT",
-    JPN: "JP",
-    KOR: "KR",
-    MAR: "MA",
-    MEX: "MX",
-    NED: "NL",
-    NLD: "NL",
-    NGA: "NG",
-    NOR: "NO",
-    NZL: "NZ",
-    POL: "PL",
-    PRT: "PT",
-    ROU: "RO",
-    SAU: "SA",
-    SCO: "GB",
-    SEN: "SN",
-    SRB: "RS",
-    SWE: "SE",
-    TUR: "TR",
-    UKR: "UA",
-    URY: "UY",
-    USA: "US",
-    VEN: "VE",
-    WAL: "GB",
+    // Amérique du Nord, Centrale & Caraïbes (CONCACAF) — 6 places
+    CAN: "CA", // Canada
+    MEX: "MX", // Mexique
+    USA: "US", // États-Unis
+    CRC: "CR", // Costa Rica
+    JAM: "JM", // Jamaïque
+    PAN: "PA", // Panama
+    HND: "HN", // Honduras
+    GTM: "GT", // Guatemala
+    SLV: "SV", // El Salvador
+    CUB: "CU", // Cuba
+    TTO: "TT", // Trinité-et-Tobago
+    HTI: "HT", // Haïti
+
+    // Amérique du Sud (CONMEBOL) — 6 places
+    ARG: "AR", // Argentine
+    BRA: "BR", // Brésil
+    COL: "CO", // Colombie
+    URY: "UY", // Uruguay
+    ECU: "EC", // Équateur
+    VEN: "VE", // Venezuela
+    CHL: "CL", // Chili
+    PER: "PE", // Pérou
+    BOL: "BO", // Bolivie
+    PRY: "PY", // Paraguay
+
+    // Europe (UEFA) — 16 places
+    ESP: "ES", // Espagne
+    FRA: "FR", // France
+    ENG: "GB", // Angleterre (même drapeau GB)
+    GBR: "GB", // Grande-Bretagne
+    DEU: "DE", // Allemagne
+    PRT: "PT", // Portugal
+    NLD: "NL", // Pays-Bas
+    NED: "NL", // alias Pays-Bas
+    BEL: "BE", // Belgique
+    ITA: "IT", // Italie
+    HRV: "HR", // Croatie
+    SRB: "RS", // Serbie
+    AUT: "AT", // Autriche
+    CHE: "CH", // Suisse
+    DNK: "DK", // Danemark
+    TUR: "TR", // Turquie
+    UKR: "UA", // Ukraine
+    HUN: "HU", // Hongrie
+    CZE: "CZ", // République tchèque
+    POL: "PL", // Pologne
+    SWE: "SE", // Suède
+    NOR: "NO", // Norvège
+    ISL: "IS", // Islande
+    ROU: "RO", // Roumanie
+    GRC: "GR", // Grèce
+    SVN: "SI", // Slovénie
+    SVK: "SK", // Slovaquie
+    ALB: "AL", // Albanie
+    GEO: "GE", // Géorgie
+    SCT: "GB", // Écosse (même drapeau GB)
+    SCO: "GB", // alias Écosse
+    WAL: "GB", // Pays de Galles
+    IRL: "IE", // Irlande
+    FIN: "FI", // Finlande
+    ISR: "IL", // Israël
+
+    // Afrique (CAF) — 9 places
+    MAR: "MA", // Maroc
+    SEN: "SN", // Sénégal
+    EGY: "EG", // Égypte
+    NGA: "NG", // Nigeria
+    CMR: "CM", // Cameroun
+    CIV: "CI", // Côte d'Ivoire
+    GHA: "GH", // Ghana
+    TUN: "TN", // Tunisie
+    DZA: "DZ", // Algérie
+    ZAF: "ZA", // Afrique du Sud
+    MLI: "ML", // Mali
+    BFA: "BF", // Burkina Faso
+    MDG: "MG", // Madagascar
+    COD: "CD", // RD Congo
+    MOZ: "MZ", // Mozambique
+    UGA: "UG", // Ouganda
+    TZA: "TZ", // Tanzanie
+    AGO: "AO", // Angola
+    GAB: "GA", // Gabon
+    ZMB: "ZM", // Zambie
+    KEN: "KE", // Kenya
+    ETH: "ET", // Éthiopie
+    BEN: "BJ", // Bénin
+    CPV: "CV", // Cap-Vert
+    GNB: "GW", // Guinée-Bissau
+    GNQ: "GQ", // Guinée équatoriale
+    LBY: "LY", // Libye
+    COM: "KM", // Comores
+    NER: "NE", // Niger
+
+    // Asie (AFC) — 8 places
+    JPN: "JP", // Japon
+    KOR: "KR", // Corée du Sud
+    IRN: "IR", // Iran
+    AUS: "AU", // Australie
+    SAU: "SA", // Arabie Saoudite
+    IRQ: "IQ", // Irak
+    JOR: "JO", // Jordanie
+    UZB: "UZ", // Ouzbékistan
+    CHN: "CN", // Chine
+    IDN: "ID", // Indonésie
+    THA: "TH", // Thaïlande
+    OMN: "OM", // Oman
+    BHR: "BH", // Bahreïn
+    KWT: "KW", // Koweït
+    QAT: "QA", // Qatar
+    UAE: "AE", // Émirats arabes unis
+    KGZ: "KG", // Kirghizistan
+    TJK: "TJ", // Tadjikistan
+    SYR: "SY", // Syrie
+    PAL: "PS", // Palestine
+    YEM: "YE", // Yémen
+    AFG: "AF", // Afghanistan
+    PRK: "KP", // Corée du Nord
+    MYS: "MY", // Malaisie
+    VNM: "VN", // Vietnam
+    SGP: "SG", // Singapour
+    MMR: "MM", // Myanmar
+    LBN: "LB", // Liban
+
+    // Océanie (OFC) — 1 place
+    NZL: "NZ", // Nouvelle-Zélande
+    FJI: "FJ", // Fidji
+    PNG: "PG", // Papouasie-Nouvelle-Guinée
+    VUT: "VU", // Vanuatu
+    SLB: "SB", // Îles Salomon
+    NCL: "NC", // Nouvelle-Calédonie (territoire FR)
+
+    // Autres pays souvent utiles
+    RUS: "RU", // Russie
+    PHL: "PH", // Philippines
+    IND: "IN", // Inde
+    PAK: "PK", // Pakistan
+    BGD: "BD", // Bangladesh
 };
 
-function getCountryFlag(countryCode: string): string {
-    if (!countryCode) return "🌍";
-
+function getIso2(countryCode: string): string | null {
+    if (!countryCode) return null;
     const normalized = countryCode.trim().toUpperCase();
     const iso2 =
         normalized.length === 2
@@ -173,13 +262,16 @@ function getCountryFlag(countryCode: string): string {
             : normalized.length === 3
               ? alpha3ToAlpha2[normalized]
               : undefined;
+    if (!iso2 || !/^[A-Z]{2}$/.test(iso2)) return null;
+    return iso2;
+}
 
-    if (!iso2 || !/^[A-Z]{2}$/.test(iso2)) return "🌍";
-
-    const codePoints = iso2
-        .split("")
-        .map((char) => 127397 + char.charCodeAt(0));
-    return String.fromCodePoint(...codePoints);
+function CountryFlag({ countryCode, className = "" }: { countryCode: string; className?: string }) {
+    const iso2 = getIso2(countryCode);
+    if (!iso2 || !hasFlag(iso2)) return <span className={className}>🌍</span>;
+    const FlagComponent = Flags[iso2 as keyof typeof Flags];
+    if (!FlagComponent) return <span className={className}>🌍</span>;
+    return <FlagComponent className={className} />;
 }
 
 function getAppearancePoints(row: Pick<PlayerPerformanceRow, "played_full_match" | "is_starter" | "is_substitute_in">): number {
@@ -560,7 +652,7 @@ export default async function ViewTeamPage() {
                                         <div
                                             className={`flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full border-2 border-white font-black text-white shadow-lg ${getPositionColor(player.position)}`}
                                         >
-                                            <span className="text-base sm:text-lg leading-none">{getCountryFlag(player.country_code)}</span>
+                                            <CountryFlag countryCode={player.country_code} className="h-5 w-7 sm:h-6 sm:w-8 rounded-[2px] object-cover" />
                                         </div>
                                         <div className="rounded bg-black/70 px-1 py-0.5 text-center max-w-[80px] sm:max-w-[100px]">
                                             <p className="text-[9px] sm:text-[10px] font-bold text-white leading-tight truncate">
@@ -619,7 +711,7 @@ export default async function ViewTeamPage() {
                                                     </p>
                                                 </div>
                                                 <span className="text-lg shrink-0">
-                                                    {getCountryFlag(player.country_code)}
+                                                    <CountryFlag countryCode={player.country_code} className="h-5 w-7 rounded-[2px] object-cover" />
                                                 </span>
                                             </div>
                                         </div>

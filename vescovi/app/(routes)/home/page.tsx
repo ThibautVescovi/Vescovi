@@ -1,5 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
+import HomeChat from "@/components/home-chat";
+import { createClient } from "@/lib/supabaseServer";
+import type { HomeChatMessage } from "./actions";
 
 const today = new Intl.DateTimeFormat("fr-FR", {
     day: "2-digit",
@@ -40,7 +43,20 @@ const news = [
     },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+    const supabase = await createClient();
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
+
+    const { data: messagesData, error: messagesError } = await supabase
+        .from("chat_messages")
+        .select("id,user_id,author_name,content,created_at")
+        .order("created_at", { ascending: false })
+        .limit(40);
+
+    const initialMessages: HomeChatMessage[] = (messagesData ?? []).slice().reverse();
+
     return (
         <div className="relative min-h-[calc(100vh-80px)] overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(250,204,21,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.18),transparent_28%)]">
             <div className="absolute inset-0 opacity-20 bg-[repeating-linear-gradient(0deg,transparent,transparent_48px,rgba(255,255,255,0.05)_50px)]" />
@@ -59,6 +75,7 @@ export default function HomePage() {
 
                         <p className="mt-5 max-w-2xl text-lg leading-8 text-emerald-50/90 sm:text-xl">
                             Crée ton équipe idéale, compare tes choix et profite d’un vrai concours de pronostics entre amis autour des plus grandes affiches du tournoi.
+                            Attention ce concours n'est pas ouvert au public, l'organisateur se réserve le droit de refuser toute inscription.
                         </p>
 
                         <div className="mt-6 flex flex-wrap gap-3">
@@ -116,7 +133,14 @@ export default function HomePage() {
                     </div>
                 </section>
 
+                <HomeChat
+                    initialMessages={initialMessages}
+                    currentUserId={user?.id ?? null}
+                    loadError={messagesError?.message ?? null}
+                />
+
                 <NewsSection />
+
             </main>
         </div>
     );

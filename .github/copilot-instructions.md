@@ -30,6 +30,18 @@ Joueur carton rouge : -5 points
 
 Mon schéma de base de données est le suivant :
 
+## Table `chat_messages`
+
+### Columns
+
+| Name | Type | Constraints |
+|------|------|-------------|
+| `id` | `uuid` | Primary |
+| `user_id` | `uuid` |  |
+| `author_name` | `text` |  |
+| `content` | `text` |  |
+| `created_at` | `timestamptz` |  |
+
 ## Table `countries`
 
 ### Columns
