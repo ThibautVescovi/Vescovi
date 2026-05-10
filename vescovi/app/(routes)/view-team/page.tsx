@@ -316,7 +316,11 @@ function formatPoints(value: number): string {
     return value > 0 ? `+${value}` : `${value}`;
 }
 
-export default async function ViewTeamPage() {
+export default async function ViewTeamPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ userId?: string }>;
+}) {
     const supabase = await createClient();
     const {
         data: { user },
@@ -340,10 +344,40 @@ export default async function ViewTeamPage() {
         );
     }
 
+    const { userId: targetUserId } = await searchParams;
+    const viewedUserId = targetUserId ?? user.id;
+    const isOwnTeam = viewedUserId === user.id;
+
+    const { data: ownEntry, error: ownEntryError } = isOwnTeam
+        ? await supabase
+              .from("entries")
+              .select("wine_name")
+              .eq("user_id", user.id)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle()
+        : { data: null, error: null };
+    const wineName = ownEntry?.wine_name?.trim() ?? "";
+    const hasWineName = wineName.length > 0;
+
+    // Récupérer le profil du joueur affiché
+    const { data: viewedProfile } = await supabase
+        .from("profiles")
+        .select("first_name, last_name")
+        .eq("id", viewedUserId)
+        .maybeSingle();
+
+    const participantName =
+        viewedProfile?.first_name || viewedProfile?.last_name
+            ? [viewedProfile.first_name, viewedProfile.last_name].filter(Boolean).join(" ")
+            : isOwnTeam
+              ? "Mon équipe"
+              : "Joueur inconnu";
+
     const { data: existingTeam, error: existingTeamError } = await supabase
         .from("teams")
         .select("id, name, total_points")
-        .eq("user_id", user.id)
+        .eq("user_id", viewedUserId)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -375,17 +409,20 @@ export default async function ViewTeamPage() {
                         Pas encore d&apos;équipe
                     </h1>
                     <p className="mt-3 text-base leading-7 text-emerald-50/80">
-                        Tu n&apos;as pas encore créé d&apos;équipe pour ce concours. Crée ton équipe dès
-                        maintenant !
+                        {isOwnTeam
+                            ? "Tu n'as pas encore créé d'équipe pour ce concours. Crée ton équipe dès maintenant !"
+                            : `${participantName} n'a pas encore créé d'équipe pour ce concours.`}
                     </p>
-                    <div className="mt-8">
-                        <Link
-                            href="/team"
-                            className="inline-block rounded-md bg-yellow-300 px-6 py-3 text-base font-black text-green-950 shadow-lg shadow-yellow-950/20 transition hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-yellow-100"
-                        >
-                            Créer mon équipe
-                        </Link>
-                    </div>
+                    {isOwnTeam && (
+                        <div className="mt-8">
+                            <Link
+                                href="/team"
+                                className="inline-block rounded-md bg-yellow-300 px-6 py-3 text-base font-black text-green-950 shadow-lg shadow-yellow-950/20 transition hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-yellow-100"
+                            >
+                                Créer mon équipe
+                            </Link>
+                        </div>
+                    )}
                 </div>
             </div>
         );
@@ -611,14 +648,33 @@ export default async function ViewTeamPage() {
             <div className="mx-auto max-w-7xl">
                 <div className="mb-8">
                     <p className="text-sm font-bold uppercase tracking-[0.24em] text-yellow-200">
-                        Mon équipe
+                        {isOwnTeam ? "Mon équipe" : "Équipe de"}
                     </p>
                     <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">
-                        {existingTeam.name}
+                        {participantName}
                     </h1>
+                    <p className="mt-1 text-lg text-emerald-50/60 font-semibold">{existingTeam.name}</p>
                     <p className="mt-2 text-base text-emerald-50/80">
                         Total de points : <span className="font-bold text-yellow-300">{existingTeam.total_points}</span>
                     </p>
+                    {isOwnTeam ? (
+                        <div className="mt-4 rounded-lg border border-white/15 bg-white/10 p-4">
+                            <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-100/80">
+                                Bouteille mise en jeu
+                            </p>
+                            {ownEntryError ? (
+                                <p className="mt-2 text-sm font-semibold text-red-200">
+                                    Impossible de charger la bouteille : {ownEntryError.message}
+                                </p>
+                            ) : hasWineName ? (
+                                <p className="mt-2 text-base font-bold text-yellow-300">{wineName}</p>
+                            ) : (
+                                <p className="mt-2 rounded-md border border-amber-300/50 bg-amber-500/15 px-3 py-2 text-sm font-semibold text-amber-100">
+                                    Attention : tu n&apos;as pas encore renseigné de bouteille.
+                                </p>
+                            )}
+                        </div>
+                    ) : null}
                 </div>
 
                 <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -720,12 +776,14 @@ export default async function ViewTeamPage() {
                         </div>
 
                         {/* Bouton d'édition */}
-                        <Link
-                            href="/team"
-                            className="block w-full rounded-md bg-yellow-300 px-5 py-3 text-center text-sm font-black text-green-950 shadow-lg shadow-yellow-950/20 transition hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-yellow-100"
-                        >
-                            Éditer mon équipe
-                        </Link>
+                        {isOwnTeam && (
+                            <Link
+                                href="/team"
+                                className="block w-full rounded-md bg-yellow-300 px-5 py-3 text-center text-sm font-black text-green-950 shadow-lg shadow-yellow-950/20 transition hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-yellow-100"
+                            >
+                                Éditer mon équipe
+                            </Link>
+                        )}
                     </div>
                 </div>
 

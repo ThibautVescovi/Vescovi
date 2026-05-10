@@ -37,6 +37,7 @@ type TeamFormProps = {
     players: Player[];
     countries: Country[];
     initialSelections: InitialSelection[];
+    initialWineName: string;
     loadError: string | null;
 };
 
@@ -132,12 +133,14 @@ export default function TeamForm({
     players,
     countries,
     initialSelections,
+    initialWineName,
     loadError,
 }: TeamFormProps) {
     const [selections, setSelections] = useState<Record<string, SlotSelection>>(() => {
         return buildSelections(initialSelections);
     });
     const [saveResult, setSaveResult] = useState<SaveTeamResult | null>(null);
+    const [wineName, setWineName] = useState(initialWineName);
     const [isSaving, startSaving] = useTransition();
     const playersById = useMemo(
         () => new Map(players.map((player) => [player.id, player])),
@@ -239,7 +242,7 @@ export default function TeamForm({
         }));
 
         startSaving(async () => {
-            const result = await saveTeam(payload);
+            const result = await saveTeam(payload, wineName);
             setSaveResult(result);
         });
     }
@@ -269,6 +272,24 @@ export default function TeamForm({
                     ) : null}
 
                     <form onSubmit={handleSubmit} className="space-y-4">
+                        <div className="rounded-lg border border-white/15 bg-white/10 p-4 shadow-xl shadow-black/20 backdrop-blur">
+                            <label className="block">
+                                <span className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-100/80">
+                                    Bouteille mise en jeu
+                                </span>
+                                <input
+                                    type="text"
+                                    value={wineName}
+                                    onChange={(event) => {
+                                        setSaveResult(null);
+                                        setWineName(event.target.value);
+                                    }}
+                                    placeholder="Ex: Cotes-du-Rhone 2022"
+                                    className="mt-2 w-full rounded-md border border-white/15 bg-white px-3 py-3 text-sm font-semibold text-slate-950 outline-none transition focus:border-yellow-300 focus:ring-2 focus:ring-yellow-300/60"
+                                />
+                            </label>
+                        </div>
+
                         <div className="overflow-hidden rounded-lg border border-white/15 bg-white/10 shadow-2xl shadow-black/25 backdrop-blur">
                             <div className="hidden grid-cols-[150px_minmax(0,240px)_minmax(0,1fr)] gap-3 border-b border-white/10 bg-emerald-950/60 px-4 py-3 text-xs font-black uppercase tracking-[0.18em] text-emerald-100 md:grid">
                                 <span>Poste</span>

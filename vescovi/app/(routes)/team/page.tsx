@@ -91,6 +91,16 @@ export default async function TeamPage() {
               .eq("is_active", true)
         : { data: null, error: null };
 
+    const { data: existingEntry, error: existingEntryError } = user
+        ? await supabase
+              .from("entries")
+              .select("wine_name")
+              .eq("user_id", user.id)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle()
+        : { data: null, error: null };
+
     const players = (playersResult.data ?? []) as Player[];
     const playersById = new Map(players.map((player) => [player.id, player]));
     const positionCounts: Record<Position, number> = {
@@ -125,6 +135,7 @@ export default async function TeamPage() {
         playersResult.error?.message ??
         countriesResult.error?.message ??
         existingTeamError?.message ??
+        existingEntryError?.message ??
         teamPlayersError?.message ??
         null;
     const initialSelectionsKey =
@@ -132,13 +143,16 @@ export default async function TeamPage() {
             .map((selection) => `${selection.slotId}:${selection.countryCode}:${selection.playerId}`)
             .sort()
             .join("|") || "empty";
+    const initialWineName = existingEntry?.wine_name ?? "";
+    const formKey = `${initialSelectionsKey}|wine:${initialWineName}`;
 
     return (
         <TeamForm
-            key={initialSelectionsKey}
+            key={formKey}
             players={players}
             countries={(countriesResult.data ?? []) as Country[]}
             initialSelections={initialSelections}
+            initialWineName={initialWineName}
             loadError={loadError}
         />
     );

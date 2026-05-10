@@ -63,7 +63,10 @@ function normalizePosition(value: string): Position | null {
     return null;
 }
 
-export async function saveTeam(selections: TeamSelectionPayload[]): Promise<SaveTeamResult> {
+export async function saveTeam(
+    selections: TeamSelectionPayload[],
+    wineName?: string,
+): Promise<SaveTeamResult> {
     const supabase = await createClient();
     const {
         data: { user },
@@ -83,6 +86,9 @@ export async function saveTeam(selections: TeamSelectionPayload[]): Promise<Save
             message: "Sélectionne les 11 joueurs avant de sauvegarder.",
         };
     }
+
+    const trimmedWineName = typeof wineName === "string" ? wineName.trim() : "";
+    const hasWineName = trimmedWineName.length > 0;
 
     const playerIds = selections.map((selection) => selection.playerId);
     const uniquePlayerIds = new Set(playerIds);
@@ -309,6 +315,73 @@ export async function saveTeam(selections: TeamSelectionPayload[]): Promise<Save
             ok: false,
             message: `Impossible d'enregistrer les joueurs : ${insertPlayersError.message}`,
         };
+    }
+
+    const { data: existingEntry, error: existingEntryError } = await supabase
+        .from("entries")
+        .select("id")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (existingEntryError) {
+        return {
+            ok: false,
+            message: `Impossible de récupérer ton inscription : ${existingEntryError.message}`,
+        };
+    }
+
+    if (existingEntry?.id) {
+        const entryUpdatePayload: { team_id: string; wine_name?: string } = {
+            team_id: teamId,
+        };
+
+        if (hasWineName) {
+            entryUpdatePayload.wine_name = trimmedWineName;
+        }
+
+        const { error: updateEntryError } = await supabase
+            .from("entries")
+            .update(entryUpdatePayload)
+            .eq("id", existingEntry.id)
+            .eq("user_id", user.id);
+
+        if (updateEntryError) {
+            if (updateEntryError.code === "42501") {
+                return {
+                    ok: false,
+                    message:
+                        "Tes droits actuels ne permettent pas de lier ton équipe à ton inscription. Contacte un administrateur (RLS entries).",
+                };
+            }
+
+            return {
+                ok: false,
+                message: `Impossible de mettre à jour ton inscription : ${updateEntryError.message}`,
+            };
+        }
+    } else {
+        const { error: createEntryError } = await supabase.from("entries").insert({
+            user_id: user.id,
+            team_id: teamId,
+            wine_name: hasWineName ? trimmedWineName : null,
+        });
+
+        if (createEntryError) {
+            if (createEntryError.code === "42501") {
+                return {
+                    ok: false,
+                    message:
+                        "Tes droits actuels ne permettent pas de créer ton inscription. Contacte un administrateur (RLS entries).",
+                };
+            }
+
+            return {
+                ok: false,
+                message: `Impossible de créer ton inscription : ${createEntryError.message}`,
+            };
+        }
     }
 
     revalidatePath("/team");
