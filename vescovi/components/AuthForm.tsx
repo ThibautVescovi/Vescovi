@@ -42,7 +42,7 @@ export default function AuthForm() {
             if (error) {
                 setMessage(error.message)
             } else {
-                setMessage('Tu peux maintenant te connecter avec tes identifiants !')
+                router.replace('/login')
             }
         }
     }

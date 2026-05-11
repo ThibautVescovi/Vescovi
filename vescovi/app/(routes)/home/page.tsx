@@ -10,11 +10,6 @@ const today = new Intl.DateTimeFormat("fr-FR", {
     year: "numeric",
 }).format(new Date());
 
-const highlights = [
-    "11 joueurs à sélectionner",
-    "Minimum 5 nationalités",
-    "2 changements possibles",
-];
 
 const news = [
     {
@@ -70,24 +65,12 @@ export default async function HomePage() {
                         </span>
 
                         <h1 className="max-w-3xl text-4xl font-black tracking-tight text-white sm:text-5xl lg:text-6xl">
-                            Vescovi.fr, le rendez-vous convivial pour vivre la coupe du monde 2026.
+                            Vescovi.fr, LE rendez-vous de la coupe du monde 2026.
                         </h1>
 
                         <p className="mt-5 max-w-2xl text-lg leading-8 text-emerald-50/90 sm:text-xl">
                             Crée ton équipe idéale, compare tes choix et profite d’un vrai concours de pronostics entre amis autour des plus grandes affiches du tournoi.
-                            Attention ce concours n'est pas ouvert au public, l'organisateur se réserve le droit de refuser toute inscription.
                         </p>
-
-                        <div className="mt-6 flex flex-wrap gap-3">
-                            {highlights.map((highlight) => (
-                                <span
-                                    key={highlight}
-                                    className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white/90 shadow-lg shadow-black/10"
-                                >
-                                    {highlight}
-                                </span>
-                            ))}
-                        </div>
 
                         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                             <Link

@@ -76,7 +76,7 @@ export default async function TeamPage() {
     const { data: existingTeam, error: existingTeamError } = user
         ? await supabase
               .from("teams")
-              .select("id")
+              .select("id,name")
               .eq("user_id", user.id)
               .order("created_at", { ascending: false })
               .limit(1)
@@ -144,7 +144,8 @@ export default async function TeamPage() {
             .sort()
             .join("|") || "empty";
     const initialWineName = existingEntry?.wine_name ?? "";
-    const formKey = `${initialSelectionsKey}|wine:${initialWineName}`;
+    const initialTeamName = existingTeam?.name ?? "Mon équipe";
+    const formKey = `${initialSelectionsKey}|wine:${initialWineName}|team:${initialTeamName}`;
 
     return (
         <TeamForm
@@ -153,6 +154,7 @@ export default async function TeamPage() {
             countries={(countriesResult.data ?? []) as Country[]}
             initialSelections={initialSelections}
             initialWineName={initialWineName}
+            initialTeamName={initialTeamName}
             loadError={loadError}
         />
     );

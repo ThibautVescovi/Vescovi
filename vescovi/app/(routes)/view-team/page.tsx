@@ -37,6 +37,12 @@ type MatchRow = {
     stage: string | null;
 };
 
+type TeamReference = {
+    id: string;
+    name: string;
+    user_id: string;
+};
+
 const slotPositions: Record<string, { x: number; y: number; position: Position }> = {
     "gk-1": { x: 50, y: 8, position: "Gardien" },
     "def-1": { x: 20, y: 30, position: "Défenseur" },
@@ -319,7 +325,7 @@ function formatPoints(value: number): string {
 export default async function ViewTeamPage({
     searchParams,
 }: {
-    searchParams: Promise<{ userId?: string }>;
+    searchParams: Promise<{ userId?: string; teamId?: string }>;
 }) {
     const supabase = await createClient();
     const {
@@ -344,8 +350,36 @@ export default async function ViewTeamPage({
         );
     }
 
-    const { userId: targetUserId } = await searchParams;
-    const viewedUserId = targetUserId ?? user.id;
+    const { userId: targetUserId, teamId: targetTeamId } = await searchParams;
+
+    const { data: selectedTeamFromScores, error: selectedTeamFromScoresError } = targetTeamId || targetUserId
+        ? await supabase
+              .from("team_scores")
+              .select("team_id, team_name, user_id, created_at")
+              .eq(targetTeamId ? "team_id" : "user_id", targetTeamId ?? targetUserId ?? "")
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle()
+        : { data: null, error: null };
+
+    const viewedUserId = selectedTeamFromScores?.user_id ?? targetUserId ?? user.id;
+
+    if (selectedTeamFromScoresError) {
+        return (
+            <div className="min-h-[calc(100vh-80px)] bg-[linear-gradient(180deg,#052e16_0%,#0f3d2e_48%,#111827_100%)] px-4 py-8 text-white sm:px-6 lg:px-8">
+                <div className="mx-auto max-w-2xl text-center">
+                    <p className="text-sm font-bold uppercase tracking-[0.24em] text-yellow-200">
+                        Erreur
+                    </p>
+                    <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">
+                        Une erreur est survenue
+                    </h1>
+                    <p className="mt-3 text-base leading-7 text-red-200">{selectedTeamFromScoresError.message}</p>
+                </div>
+            </div>
+        );
+    }
+
     const isOwnTeam = viewedUserId === user.id;
 
     const { data: ownEntry, error: ownEntryError } = isOwnTeam
@@ -374,13 +408,23 @@ export default async function ViewTeamPage({
               ? "Mon équipe"
               : "Joueur inconnu";
 
-    const { data: existingTeam, error: existingTeamError } = await supabase
-        .from("teams")
-        .select("id, name, total_points")
-        .eq("user_id", viewedUserId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+    const selectedTeam: TeamReference | null = selectedTeamFromScores
+        ? {
+              id: selectedTeamFromScores.team_id,
+              name: selectedTeamFromScores.team_name,
+              user_id: selectedTeamFromScores.user_id,
+          }
+        : null;
+
+    const { data: existingTeam, error: existingTeamError } = selectedTeam
+        ? { data: selectedTeam, error: null }
+        : await supabase
+              .from("teams")
+              .select("id, name, user_id")
+              .eq("user_id", viewedUserId)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
 
     if (existingTeamError) {
         return (
@@ -651,11 +695,11 @@ export default async function ViewTeamPage({
                         {isOwnTeam ? "Mon équipe" : "Équipe de"}
                     </p>
                     <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">
-                        {participantName}
+                        {existingTeam.name}
                     </h1>
-                    <p className="mt-1 text-lg text-emerald-50/60 font-semibold">{existingTeam.name}</p>
+                    <p className="mt-1 text-lg text-emerald-50/60 font-semibold">{participantName}</p>
                     <p className="mt-2 text-base text-emerald-50/80">
-                        Total de points : <span className="font-bold text-yellow-300">{existingTeam.total_points}</span>
+                        Total de points : <span className="font-bold text-yellow-300">{teamTotalPoints}</span>
                     </p>
                     {isOwnTeam ? (
                         <div className="mt-4 rounded-lg border border-white/15 bg-white/10 p-4">

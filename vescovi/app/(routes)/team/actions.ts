@@ -66,6 +66,7 @@ function normalizePosition(value: string): Position | null {
 export async function saveTeam(
     selections: TeamSelectionPayload[],
     wineName?: string,
+    teamName?: string,
 ): Promise<SaveTeamResult> {
     const supabase = await createClient();
     const {
@@ -89,6 +90,8 @@ export async function saveTeam(
 
     const trimmedWineName = typeof wineName === "string" ? wineName.trim() : "";
     const hasWineName = trimmedWineName.length > 0;
+    const trimmedTeamName = typeof teamName === "string" ? teamName.trim() : "";
+    const finalTeamName = trimmedTeamName.length > 0 ? trimmedTeamName : "Mon équipe";
 
     const playerIds = selections.map((selection) => selection.playerId);
     const uniquePlayerIds = new Set(playerIds);
@@ -209,8 +212,7 @@ export async function saveTeam(
             .from("teams")
             .insert({
                 user_id: user.id,
-                name: "Mon équipe",
-                total_points: 0,
+                name: finalTeamName,
             })
             .select("id")
             .single();
@@ -226,7 +228,7 @@ export async function saveTeam(
     } else {
         const { error: updateTeamError } = await supabase
             .from("teams")
-            .update({ name: "Mon équipe" })
+            .update({ name: finalTeamName })
             .eq("id", teamId)
             .eq("user_id", user.id);
 
@@ -392,6 +394,8 @@ export async function saveTeam(
     }
 
     revalidatePath("/team");
+    revalidatePath("/view-team");
+    revalidatePath("/ranking");
 
     return {
         ok: true,

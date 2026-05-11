@@ -40,6 +40,18 @@ export type CreateMatchResult = {
     matchId?: string;
 };
 
+const ALLOWED_STAGES = [
+    "Match 1",
+    "Match 2",
+    "Match 3",
+    "Huitièmes",
+    "Quarts",
+    "Demis",
+    "Finales",
+] as const;
+
+type Stage = (typeof ALLOWED_STAGES)[number];
+
 function getAppearancePoints(appearance: Appearance) {
     if (appearance === "full") {
         return 2;
@@ -189,6 +201,10 @@ function toPerformancePayload(row: PlayerPointInput) {
         is_starter: row.appearance === "full" || row.appearance === "subbed_out",
         is_substitute_in: row.appearance === "subbed_in",
     };
+}
+
+function isAllowedStage(value: string): value is Stage {
+    return (ALLOWED_STAGES as readonly string[]).includes(value);
 }
 
 async function recalculateTeamTotals(): Promise<SavePointsResult> {
@@ -392,7 +408,7 @@ export async function createMatch(input: {
     homeTeam: string;
     awayTeam: string;
     kickoffAt: string;
-    stage: string;
+    stage: Stage;
 }): Promise<CreateMatchResult> {
     await requireAdminRole();
 
@@ -409,6 +425,20 @@ export async function createMatch(input: {
         };
     }
 
+    if (!isAllowedStage(stage)) {
+        return {
+            ok: false,
+            message: "Phase invalide.",
+        };
+    }
+
+    if (homeTeam === awayTeam) {
+        return {
+            ok: false,
+            message: "Equipe domicile et equipe exterieure doivent etre differentes.",
+        };
+    }
+
     if (Number.isNaN(kickoffDate.getTime())) {
         return {
             ok: false,
@@ -417,13 +447,32 @@ export async function createMatch(input: {
     }
 
     const supabase = await createClient();
+    const { data: countries, error: countriesError } = await supabase
+        .from("countries")
+        .select("code")
+        .in("code", [homeTeam, awayTeam]);
+
+    if (countriesError) {
+        return {
+            ok: false,
+            message: `Impossible de verifier les pays: ${countriesError.message}`,
+        };
+    }
+
+    if ((countries ?? []).length !== 2) {
+        return {
+            ok: false,
+            message: "Selection de pays invalide.",
+        };
+    }
+
     const { data, error } = await supabase
         .from("matches")
         .insert({
             team_home: homeTeam,
             team_away: awayTeam,
             match_date: kickoffDate.toISOString(),
-            stage: stage || null,
+            stage,
         })
         .select("id")
         .single();

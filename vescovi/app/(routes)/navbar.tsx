@@ -90,12 +90,13 @@ export default function Navbar({ canAccessAdmin }: NavbarProps) {
                     <button
                         type="button"
                         onClick={handleLogout}
-                        className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-red-300/40 bg-red-500/90 px-2.5 py-1.5 text-xs font-bold text-white shadow-lg shadow-red-950/20 transition hover:-translate-y-0.5 hover:border-red-200 hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-200 sm:gap-2 sm:px-4 sm:py-2 sm:text-sm"
+                        className="flex shrink-0 cursor-pointer items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-1.5 text-xs font-medium text-white/40 transition hover:border-red-300/40 hover:bg-red-500/20 hover:text-white/70 focus:outline-none focus:ring-1 focus:ring-red-300/50 sm:px-3 sm:py-2"
+                        title="Déconnexion"
                     >
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-950/30 text-[10px] font-black ring-1 ring-white/20 sm:h-7 sm:w-7" aria-hidden="true">
-                            OUT
-                        </span>
-                        <span>Deconnexion</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h6a2 2 0 012 2v1" />
+                        </svg>
+                        <span className="hidden sm:inline">Déconnexion</span>
                     </button>
                 </div>
             </div>

@@ -27,6 +27,8 @@ Joueur entrant : +1 point
 Joueur carton jaune : -2 points 
 Joueur carton rouge : -5 points
 
+Tout le code doit être compatible mobile (responsible design)
+
 
 Mon schéma de base de données est le suivant :
 
@@ -60,7 +62,7 @@ Mon schéma de base de données est le suivant :
 | `id` | `uuid` | Primary |
 | `user_id` | `uuid` |  |
 | `team_id` | `uuid` |  |
-| `wine_name` | `text` |  |
+| `wine_name` | `text` |  Nullable |
 | `created_at` | `timestamp` |  Nullable |
 
 ## Table `matches`

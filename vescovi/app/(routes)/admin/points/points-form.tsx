@@ -53,6 +53,18 @@ type RowState = {
     appearance: Appearance;
 };
 
+const STAGE_OPTIONS = [
+    "Match 1",
+    "Match 2",
+    "Match 3",
+    "Huitièmes",
+    "Quarts",
+    "Demis",
+    "Finales",
+] as const;
+
+type StageOption = (typeof STAGE_OPTIONS)[number];
+
 function hasPlayed(appearance: Appearance) {
     return appearance !== "none";
 }
@@ -136,8 +148,10 @@ function computePoints(position: Position, row: RowState) {
     return goalsPoints + cardPoints + appearancePoints + defensivePoints;
 }
 
-function formatMatchLabel(match: Match) {
+function formatMatchLabel(match: Match, countriesByCode: Map<string, string>) {
     const kickoffDate = new Date(match.match_date ?? "");
+    const homeLabel = countriesByCode.get(match.team_home) ?? match.team_home;
+    const awayLabel = countriesByCode.get(match.team_away) ?? match.team_away;
     const dateLabel = Number.isNaN(kickoffDate.getTime())
         ? "Date inconnue"
         : kickoffDate.toLocaleString("fr-FR", {
@@ -148,7 +162,7 @@ function formatMatchLabel(match: Match) {
               minute: "2-digit",
           });
 
-    return `${match.team_home} vs ${match.team_away} - ${dateLabel}`;
+    return `${homeLabel} vs ${awayLabel} - ${dateLabel}`;
 }
 
 function getDatetimeLocalDefault() {
@@ -175,13 +189,18 @@ export default function PointsForm({
     const [positionFilter, setPositionFilter] = useState<Position | "ALL">("ALL");
     const [isPending, startTransition] = useTransition();
     const [result, setResult] = useState<SavePointsResult | null>(null);
-    const [newHomeTeam, setNewHomeTeam] = useState("");
-    const [newAwayTeam, setNewAwayTeam] = useState("");
+    const [newHomeTeam, setNewHomeTeam] = useState(() => countries[0]?.code ?? "");
+    const [newAwayTeam, setNewAwayTeam] = useState(() => countries[1]?.code ?? countries[0]?.code ?? "");
     const [newKickoffAt, setNewKickoffAt] = useState(getDatetimeLocalDefault());
-    const [newStage, setNewStage] = useState("");
+    const [newStage, setNewStage] = useState<StageOption>(STAGE_OPTIONS[0]);
 
     const countriesByCode = useMemo(
         () => new Map(countries.map((country) => [country.code, country.name])),
+        [countries],
+    );
+
+    const sortedCountries = useMemo(
+        () => countries.slice().sort((a, b) => a.name.localeCompare(b.name, "fr-FR")),
         [countries],
     );
 
@@ -214,6 +233,16 @@ export default function PointsForm({
         [currentMatchId, matches],
     );
 
+    const canEditPoints = Boolean(selectedMatch);
+
+    const selectedMatchCountryCodes = useMemo(() => {
+        if (!selectedMatch) {
+            return new Set<string>();
+        }
+
+        return new Set([selectedMatch.team_home, selectedMatch.team_away]);
+    }, [selectedMatch]);
+
     const playersWithMeta = useMemo(() => {
         return players
             .map((player) => ({
@@ -243,13 +272,18 @@ export default function PointsForm({
     }, [countriesByCode, players]);
 
     const filteredPlayers = useMemo(() => {
+        if (!canEditPoints) {
+            return [];
+        }
+
         return playersWithMeta.filter((player) => {
+            const inSelectedMatchCountries = selectedMatchCountryCodes.has(player.country_code);
             const countryOk = countryFilter === "ALL" || player.country_code === countryFilter;
             const positionOk =
                 positionFilter === "ALL" || player.normalizedPosition === positionFilter;
-            return countryOk && positionOk;
+            return inSelectedMatchCountries && countryOk && positionOk;
         });
-    }, [countryFilter, playersWithMeta, positionFilter]);
+    }, [canEditPoints, countryFilter, playersWithMeta, positionFilter, selectedMatchCountryCodes]);
 
     const editedCount = useMemo(() => {
         let total = 0;
@@ -301,8 +335,8 @@ export default function PointsForm({
     function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
 
-        if (!currentMatchId) {
-            setResult({ ok: false, message: "Choisis d'abord un match." });
+        if (!currentMatchId || !selectedMatch) {
+            setResult({ ok: false, message: "Crée ou sélectionne un match avant de saisir des points." });
             return;
         }
 
@@ -336,6 +370,16 @@ export default function PointsForm({
     function onCreateMatch() {
         setResult(null);
 
+        if (!newHomeTeam || !newAwayTeam) {
+            setResult({ ok: false, message: "Choisis les deux pays du match." });
+            return;
+        }
+
+        if (newHomeTeam === newAwayTeam) {
+            setResult({ ok: false, message: "Domicile et exterieure doivent etre differents." });
+            return;
+        }
+
         startTransition(async () => {
             const creationResult = await createMatch({
                 homeTeam: newHomeTeam,
@@ -347,9 +391,9 @@ export default function PointsForm({
             setResult({ ok: creationResult.ok, message: creationResult.message });
 
             if (creationResult.ok && creationResult.matchId) {
-                setNewHomeTeam("");
-                setNewAwayTeam("");
-                setNewStage("");
+                setNewHomeTeam(countries[0]?.code ?? "");
+                setNewAwayTeam(countries[1]?.code ?? countries[0]?.code ?? "");
+                setNewStage(STAGE_OPTIONS[0]);
                 onChangeMatch(creationResult.matchId);
             }
         });
@@ -386,7 +430,7 @@ export default function PointsForm({
                                     {matches.length === 0 ? <option value="">Aucun match</option> : null}
                                     {matches.map((match) => (
                                         <option key={match.id} value={match.id}>
-                                            {formatMatchLabel(match)}
+                                            {formatMatchLabel(match, countriesByCode)}
                                         </option>
                                     ))}
                                 </select>
@@ -400,7 +444,7 @@ export default function PointsForm({
                             <div className="rounded-md border border-white/15 bg-white/5 px-3 py-2 text-xs text-emerald-100">
                                 {selectedMatch ? (
                                     <div className="space-y-1">
-                                        <span className="block">Edition active: {formatMatchLabel(selectedMatch)}</span>
+                                        <span className="block">Edition active: {formatMatchLabel(selectedMatch, countriesByCode)}</span>
                                         {selectedMatchSummary ? <span className="block text-emerald-200/80">{selectedMatchSummary}</span> : null}
                                     </div>
                                 ) : (
@@ -412,23 +456,31 @@ export default function PointsForm({
                         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                             <label className="text-sm font-semibold">
                                 Equipe domicile
-                                <input
-                                    type="text"
+                                <select
                                     value={newHomeTeam}
                                     onChange={(event) => setNewHomeTeam(event.target.value)}
                                     className="mt-1 w-full rounded-md border border-white/20 bg-white px-3 py-2 text-slate-900"
-                                    placeholder="France"
-                                />
+                                >
+                                    {sortedCountries.map((country) => (
+                                        <option key={`home-${country.code}`} value={country.code}>
+                                            {country.name}
+                                        </option>
+                                    ))}
+                                </select>
                             </label>
                             <label className="text-sm font-semibold">
                                 Equipe exterieure
-                                <input
-                                    type="text"
+                                <select
                                     value={newAwayTeam}
                                     onChange={(event) => setNewAwayTeam(event.target.value)}
                                     className="mt-1 w-full rounded-md border border-white/20 bg-white px-3 py-2 text-slate-900"
-                                    placeholder="Brésil"
-                                />
+                                >
+                                    {sortedCountries.map((country) => (
+                                        <option key={`away-${country.code}`} value={country.code}>
+                                            {country.name}
+                                        </option>
+                                    ))}
+                                </select>
                             </label>
                             <label className="text-sm font-semibold">
                                 Coup d&apos;envoi
@@ -441,13 +493,17 @@ export default function PointsForm({
                             </label>
                             <label className="text-sm font-semibold">
                                 Phase
-                                <input
-                                    type="text"
+                                <select
                                     value={newStage}
-                                    onChange={(event) => setNewStage(event.target.value)}
+                                    onChange={(event) => setNewStage(event.target.value as StageOption)}
                                     className="mt-1 w-full rounded-md border border-white/20 bg-white px-3 py-2 text-slate-900"
-                                    placeholder="Phase de groupes"
-                                />
+                                >
+                                    {STAGE_OPTIONS.map((stage) => (
+                                        <option key={stage} value={stage}>
+                                            {stage}
+                                        </option>
+                                    ))}
+                                </select>
                             </label>
                             <button
                                 type="button"
@@ -466,6 +522,7 @@ export default function PointsForm({
                             <select
                                 value={countryFilter}
                                 onChange={(event) => setCountryFilter(event.target.value)}
+                                disabled={!canEditPoints}
                                 className="mt-1 w-full rounded-md border border-white/20 bg-white px-3 py-2 text-slate-900"
                             >
                                 <option value="ALL">Tous les pays</option>
@@ -485,6 +542,7 @@ export default function PointsForm({
                             <select
                                 value={positionFilter}
                                 onChange={(event) => setPositionFilter(event.target.value as Position | "ALL")}
+                                disabled={!canEditPoints}
                                 className="mt-1 w-full rounded-md border border-white/20 bg-white px-3 py-2 text-slate-900"
                             >
                                 <option value="ALL">Tous les postes</option>
@@ -501,6 +559,11 @@ export default function PointsForm({
                     </section>
 
                     <section className="overflow-hidden rounded-lg border border-white/15 bg-white/10 shadow-2xl shadow-black/20">
+                        {!canEditPoints ? (
+                            <div className="border-b border-white/10 bg-emerald-950/50 px-4 py-3 text-sm font-semibold text-amber-200">
+                                Crée ou sélectionne un match pour commencer la saisie des points.
+                            </div>
+                        ) : null}
                         <div className="overflow-x-auto">
                             <table className="min-w-[1050px] w-full text-left text-sm">
                                 <thead className="bg-emerald-950/70 text-xs uppercase tracking-[0.16em] text-emerald-100">
@@ -517,6 +580,13 @@ export default function PointsForm({
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/10">
+                                    {canEditPoints && filteredPlayers.length === 0 ? (
+                                        <tr className="bg-white/5">
+                                            <td colSpan={9} className="px-3 py-4 text-center text-sm text-emerald-100/85">
+                                                Aucun joueur ne correspond aux pays du match et aux filtres actifs.
+                                            </td>
+                                        </tr>
+                                    ) : null}
                                     {filteredPlayers.map((player) => {
                                         const row = rows.get(player.id) ?? defaultRowState();
                                         const position = player.normalizedPosition as Position;
@@ -614,7 +684,7 @@ export default function PointsForm({
                         </p>
                         <button
                             type="submit"
-                            disabled={isPending || !currentMatchId}
+                            disabled={isPending || !canEditPoints}
                             className="rounded-md bg-yellow-300 px-5 py-3 text-sm font-black text-green-950 shadow-lg shadow-yellow-950/20 transition hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-yellow-100 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
                         >
                             {isPending ? "Enregistrement..." : "Enregistrer les points"}

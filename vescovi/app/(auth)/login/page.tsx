@@ -1,4 +1,5 @@
 import {redirect} from 'next/navigation'
+import Image from 'next/image'
 import AuthForm from '@/components/AuthForm'
 import {createClient} from '@/lib/supabaseServer'
 
@@ -35,9 +36,12 @@ export default async function LoginPage() {
         text-black
       "
             >
-                <img
+                <Image
                     src="/logo.png"
                     alt="Vescovi"
+                    width={140}
+                    height={140}
+                    priority
                     className="h-24 w-auto mx-auto mb-2 scale-150 sm:h-28"
                 />
                 <h1 className="text-2xl font-bold mb-6 text-center">

@@ -38,6 +38,7 @@ type TeamFormProps = {
     countries: Country[];
     initialSelections: InitialSelection[];
     initialWineName: string;
+    initialTeamName: string;
     loadError: string | null;
 };
 
@@ -134,6 +135,7 @@ export default function TeamForm({
     countries,
     initialSelections,
     initialWineName,
+    initialTeamName,
     loadError,
 }: TeamFormProps) {
     const [selections, setSelections] = useState<Record<string, SlotSelection>>(() => {
@@ -141,6 +143,7 @@ export default function TeamForm({
     });
     const [saveResult, setSaveResult] = useState<SaveTeamResult | null>(null);
     const [wineName, setWineName] = useState(initialWineName);
+    const [teamName, setTeamName] = useState(initialTeamName);
     const [isSaving, startSaving] = useTransition();
     const playersById = useMemo(
         () => new Map(players.map((player) => [player.id, player])),
@@ -242,7 +245,7 @@ export default function TeamForm({
         }));
 
         startSaving(async () => {
-            const result = await saveTeam(payload, wineName);
+            const result = await saveTeam(payload, wineName, teamName);
             setSaveResult(result);
         });
     }
@@ -272,6 +275,24 @@ export default function TeamForm({
                     ) : null}
 
                     <form onSubmit={handleSubmit} className="space-y-4">
+                        <div className="rounded-lg border border-white/15 bg-white/10 p-4 shadow-xl shadow-black/20 backdrop-blur">
+                            <label className="block">
+                                <span className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-100/80">
+                                    Nom de l&apos;équipe
+                                </span>
+                                <input
+                                    type="text"
+                                    value={teamName}
+                                    onChange={(event) => {
+                                        setSaveResult(null);
+                                        setTeamName(event.target.value);
+                                    }}
+                                    placeholder="Ex: Les Etoiles du Mondial"
+                                    className="mt-2 w-full rounded-md border border-white/15 bg-white px-3 py-3 text-sm font-semibold text-slate-950 outline-none transition focus:border-yellow-300 focus:ring-2 focus:ring-yellow-300/60"
+                                />
+                            </label>
+                        </div>
+
                         <div className="rounded-lg border border-white/15 bg-white/10 p-4 shadow-xl shadow-black/20 backdrop-blur">
                             <label className="block">
                                 <span className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-100/80">
