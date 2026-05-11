@@ -250,6 +250,13 @@ export async function saveTeam(
         }
     }
 
+    if (!teamId) {
+        return {
+            ok: false,
+            message: "Impossible de déterminer l'identifiant de ton équipe.",
+        };
+    }
+
     const rows = selections.map((selection) => {
         const player = playersById.get(selection.playerId);
 
