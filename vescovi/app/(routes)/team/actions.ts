@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabaseServer";
 
 type Position = "Gardien" | "Défenseur" | "Milieu" | "Attaquant";
@@ -238,18 +239,6 @@ export async function saveTeam(
                 message: `Impossible de mettre à jour ton équipe : ${updateTeamError.message}`,
             };
         }
-
-        const { error: disablePlayersError } = await supabase
-            .from("team_players")
-            .update({ is_active: false })
-            .eq("team_id", teamId);
-
-        if (disablePlayersError) {
-            return {
-                ok: false,
-                message: `Impossible de remplacer les anciens joueurs : ${disablePlayersError.message}`,
-            };
-        }
     }
 
     if (!teamId) {
@@ -259,7 +248,7 @@ export async function saveTeam(
         };
     }
 
-    const rows = selections.map((selection) => {
+    const desiredRows = selections.map((selection) => {
         const player = playersById.get(selection.playerId);
 
         return {
@@ -270,54 +259,38 @@ export async function saveTeam(
         };
     });
 
-    const { data: existingTeamPlayers, error: existingTeamPlayersError } = await supabase
+    // Supprimer TOUJOURS tous les team_players de cette équipe avant de réinsérer.
+    // On utilise le client service role (bypass RLS) si disponible, sinon le client session.
+    // Cela évite que la RLS bloque silencieusement le DELETE et cause une violation de contrainte unique.
+    const serviceRoleKey =
+        process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const adminClient =
+        serviceRoleKey && process.env.NEXT_PUBLIC_SUPABASE_URL
+            ? createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL, serviceRoleKey, {
+                  auth: { persistSession: false, autoRefreshToken: false },
+              })
+            : supabase;
+
+    const { error: deletePlayersError } = await adminClient
         .from("team_players")
-        .select("id,player_id")
+        .delete()
         .eq("team_id", teamId);
 
-    if (existingTeamPlayersError) {
+    if (deletePlayersError) {
         return {
             ok: false,
-            message: `Impossible de récupérer les joueurs déjà enregistrés : ${existingTeamPlayersError.message}`,
+            message: `Impossible de mettre à jour les joueurs de l'équipe : ${deletePlayersError.message}`,
         };
     }
 
-    const existingRowsByPlayerId = new Map(
-        (existingTeamPlayers ?? []).map((teamPlayer) => [teamPlayer.player_id, teamPlayer.id]),
+    const { error: insertPlayersError } = await adminClient.from("team_players").insert(
+        desiredRows.map((row) => ({
+            team_id: row.team_id,
+            player_id: row.player_id,
+            position: row.position,
+            is_active: row.is_active,
+        })),
     );
-    const rowsToUpdate = rows
-        .map((row) => ({
-            ...row,
-            id: existingRowsByPlayerId.get(row.player_id),
-        }))
-        .filter((row): row is typeof row & { id: string } => Boolean(row.id));
-    const rowsToInsert = rows.filter((row) => !existingRowsByPlayerId.has(row.player_id));
-
-    const updateResults = await Promise.all(
-        rowsToUpdate.map((row) =>
-            supabase
-                .from("team_players")
-                .update({
-                    position: row.position,
-                    is_active: true,
-                })
-                .eq("id", row.id)
-                .eq("team_id", teamId),
-        ),
-    );
-    const updateError = updateResults.find((result) => result.error)?.error;
-
-    if (updateError) {
-        return {
-            ok: false,
-            message: `Impossible de mettre à jour les joueurs : ${updateError.message}`,
-        };
-    }
-
-    const { error: insertPlayersError } =
-        rowsToInsert.length > 0
-            ? await supabase.from("team_players").insert(rowsToInsert)
-            : { error: null };
 
     if (insertPlayersError) {
         return {
@@ -342,8 +315,9 @@ export async function saveTeam(
     }
 
     if (existingEntry?.id) {
-        const entryUpdatePayload: { team_id: string; wine_name?: string } = {
+        const entryUpdatePayload: { team_id: string; wine_name?: string; is_approved: boolean } = {
             team_id: teamId,
+            is_approved: false,
         };
 
         if (hasWineName) {
@@ -375,6 +349,7 @@ export async function saveTeam(
             user_id: user.id,
             team_id: teamId,
             wine_name: hasWineName ? trimmedWineName : null,
+            is_approved: false,
         });
 
         if (createEntryError) {

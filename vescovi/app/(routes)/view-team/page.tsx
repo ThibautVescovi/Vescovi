@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabaseServer";
 import * as Flags from "country-flag-icons/react/3x2";
 import { hasFlag } from "country-flag-icons";
+import { approveTeamEntry } from "./actions";
 
 type Position = "Gardien" | "Défenseur" | "Milieu" | "Attaquant";
 
@@ -41,6 +42,12 @@ type TeamReference = {
     id: string;
     name: string;
     user_id: string;
+};
+
+type EntryReference = {
+    id: string;
+    wine_name: string | null;
+    is_approved: boolean | null;
 };
 
 const slotPositions: Record<string, { x: number; y: number; position: Position }> = {
@@ -352,6 +359,13 @@ export default async function ViewTeamPage({
 
     const { userId: targetUserId, teamId: targetTeamId } = await searchParams;
 
+    const { data: currentProfile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+    const canApproveTeams = currentProfile?.role === "admin" || currentProfile?.role === "superadmin";
+
     const { data: selectedTeamFromScores, error: selectedTeamFromScoresError } = targetTeamId || targetUserId
         ? await supabase
               .from("team_scores")
@@ -381,18 +395,6 @@ export default async function ViewTeamPage({
     }
 
     const isOwnTeam = viewedUserId === user.id;
-
-    const { data: ownEntry, error: ownEntryError } = isOwnTeam
-        ? await supabase
-              .from("entries")
-              .select("wine_name")
-              .eq("user_id", user.id)
-              .order("created_at", { ascending: false })
-              .limit(1)
-              .maybeSingle()
-        : { data: null, error: null };
-    const wineName = ownEntry?.wine_name?.trim() ?? "";
-    const hasWineName = wineName.length > 0;
 
     // Récupérer le profil du joueur affiché
     const { data: viewedProfile } = await supabase
@@ -471,6 +473,28 @@ export default async function ViewTeamPage({
             </div>
         );
     }
+
+    const { data: viewedEntryData, error: viewedEntryError } = await supabase
+        .from("entries")
+        .select("id,wine_name,is_approved")
+        .eq("team_id", existingTeam.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+    const viewedEntry = (viewedEntryData ?? null) as EntryReference | null;
+    const wineName = viewedEntry?.wine_name?.trim() ?? "";
+    const hasWineName = wineName.length > 0;
+    const isApproved = Boolean(viewedEntry?.is_approved);
+    const approvalStatusLabel = viewedEntryError
+        ? "Statut indisponible"
+        : isApproved
+          ? "Equipe validee"
+          : "En attente de validation admin";
+    const approvalStatusClassName = viewedEntryError
+        ? "border-slate-300/50 bg-slate-400/15 text-slate-100"
+        : isApproved
+          ? "border-emerald-300/40 bg-emerald-400/15 text-emerald-100"
+          : "border-amber-300/50 bg-amber-400/15 text-amber-100";
 
     const { data: teamPlayers, error: teamPlayersError } = await supabase
         .from("team_players")
@@ -687,6 +711,11 @@ export default async function ViewTeamPage({
 
     const teamTotalPoints = teamPointsRows.reduce((sum, row) => sum + row.total, 0);
 
+    const approveEntryAction = async (): Promise<void> => {
+        "use server";
+        await approveTeamEntry(existingTeam.id);
+    };
+
     return (
         <div className="min-h-[calc(100vh-80px)] bg-[linear-gradient(180deg,#052e16_0%,#0f3d2e_48%,#111827_100%)] px-4 py-8 text-white sm:px-6 lg:px-8">
             <div className="mx-auto max-w-7xl">
@@ -701,14 +730,32 @@ export default async function ViewTeamPage({
                     <p className="mt-2 text-base text-emerald-50/80">
                         Total de points : <span className="font-bold text-yellow-300">{teamTotalPoints}</span>
                     </p>
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                        <span
+                            className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-[0.15em] ${approvalStatusClassName}`}
+                        >
+                            {approvalStatusLabel}
+                        </span>
+
+                        {canApproveTeams && !isApproved ? (
+                            <form action={approveEntryAction}>
+                                <button
+                                    type="submit"
+                                    className="rounded-md bg-emerald-300 px-4 py-2 text-xs cursor-pointer font-black uppercase tracking-[0.12em] text-emerald-950 shadow-lg shadow-emerald-900/20 transition hover:bg-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                                >
+                                    Validation definitive
+                                </button>
+                            </form>
+                        ) : null}
+                    </div>
                     {isOwnTeam ? (
                         <div className="mt-4 rounded-lg border border-white/15 bg-white/10 p-4">
                             <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-100/80">
                                 Bouteille mise en jeu
                             </p>
-                            {ownEntryError ? (
+                            {viewedEntryError ? (
                                 <p className="mt-2 text-sm font-semibold text-red-200">
-                                    Impossible de charger la bouteille : {ownEntryError.message}
+                                    Impossible de charger la bouteille : {viewedEntryError.message}
                                 </p>
                             ) : hasWineName ? (
                                 <p className="mt-2 text-base font-bold text-yellow-300">{wineName}</p>

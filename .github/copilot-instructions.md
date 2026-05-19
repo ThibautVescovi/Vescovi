@@ -64,6 +64,7 @@ Mon schéma de base de données est le suivant :
 | `team_id` | `uuid` |  |
 | `wine_name` | `text` |  Nullable |
 | `created_at` | `timestamp` |  Nullable |
+| `is_approved` | `bool` |  |
 
 ## Table `matches`
 

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
     createPlayer,
     deletePlayer,
-    updatePlayer,
+    savePlayersBatch,
     type PlayerMutationResult,
 } from "./actions";
 
@@ -53,19 +53,34 @@ function normalizeText(value: string) {
 function normalizePositionCode(value: string): PositionCode {
     const position = normalizeText(value);
 
-    if (["g", "gb", "gk", "goalkeeper", "keeper", "gardien"].includes(position) || position.includes("gardien")) {
+    if (
+        ["g", "gb", "gk", "goalkeeper", "keeper", "gardien"].includes(position) ||
+        position.includes("gardien")
+    ) {
         return "GK";
     }
 
-    if (["d", "df", "def", "defenseur", "defender", "defence", "defense"].includes(position) || position.includes("defenseur") || position.includes("defender")) {
+    if (
+        ["d", "df", "def", "defenseur", "defender", "defence", "defense"].includes(position) ||
+        position.includes("defenseur") ||
+        position.includes("defender")
+    ) {
         return "DEF";
     }
 
-    if (["m", "mf", "mid", "milieu", "midfield", "midfielder"].includes(position) || position.includes("milieu") || position.includes("midfield")) {
+    if (
+        ["m", "mf", "mid", "milieu", "midfield", "midfielder"].includes(position) ||
+        position.includes("milieu") ||
+        position.includes("midfield")
+    ) {
         return "MID";
     }
 
-    if (["a", "fw", "fwd", "att", "attaquant", "attack", "attacker", "forward"].includes(position) || position.includes("attaquant") || position.includes("forward")) {
+    if (
+        ["a", "fw", "fwd", "att", "attaquant", "attack", "attacker", "forward"].includes(position) ||
+        position.includes("attaquant") ||
+        position.includes("forward")
+    ) {
         return "FWD";
     }
 
@@ -99,6 +114,11 @@ export default function PlayersAdminForm({ players, countries }: PlayersAdminFor
     const [isPending, startTransition] = useTransition();
 
     const countriesByCode = useMemo(() => buildCountryMap(countries), [countries]);
+
+    const baselineById = useMemo(
+        () => new Map(buildEditablePlayers(players).map((item) => [item.id, item])),
+        [players],
+    );
 
     const sortedItems = useMemo(() => {
         return items
@@ -137,6 +157,22 @@ export default function PlayersAdminForm({ players, countries }: PlayersAdminFor
         });
     }, [countriesByCode, countryFilter, nameFilter, positionFilter, sortedItems]);
 
+    const changedItems = useMemo(() => {
+        return items.filter((item) => {
+            const baseline = baselineById.get(item.id);
+
+            if (!baseline) {
+                return true;
+            }
+
+            return (
+                item.name.trim() !== baseline.name.trim() ||
+                item.countryCode !== baseline.countryCode ||
+                item.position !== baseline.position
+            );
+        });
+    }, [baselineById, items]);
+
     function updateLocalItem(playerId: string, patch: Partial<EditablePlayer>) {
         setResult(null);
         setItems((current) =>
@@ -166,16 +202,24 @@ export default function PlayersAdminForm({ players, countries }: PlayersAdminFor
         });
     }
 
-    function onSavePlayer(item: EditablePlayer) {
+    function onSaveAllPlayers() {
         setResult(null);
 
+        if (!changedItems.length) {
+            setResult({ ok: false, message: "Aucune modification a sauvegarder." });
+            return;
+        }
+
         startTransition(async () => {
-            setPendingAction(`save-${item.id}`);
-            const mutationResult = await updatePlayer(item.id, {
-                name: item.name,
-                countryCode: item.countryCode,
-                position: item.position,
-            });
+            setPendingAction("save-all");
+            const mutationResult = await savePlayersBatch(
+                changedItems.map((item) => ({
+                    id: item.id,
+                    name: item.name,
+                    countryCode: item.countryCode,
+                    position: item.position,
+                })),
+            );
 
             setResult(mutationResult);
             setPendingAction(null);
@@ -350,7 +394,7 @@ export default function PlayersAdminForm({ players, countries }: PlayersAdminFor
                                 key={item.id}
                                 className="rounded-lg border border-white/15 bg-white/10 p-4 shadow-lg shadow-black/20"
                             >
-                                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_auto_auto] lg:items-end">
+                                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
                                     <label className="text-sm font-semibold">
                                         Nom
                                         <input
@@ -403,15 +447,6 @@ export default function PlayersAdminForm({ players, countries }: PlayersAdminFor
 
                                     <button
                                         type="button"
-                                        onClick={() => onSavePlayer(item)}
-                                        disabled={isPending}
-                                        className="h-fit rounded-md bg-emerald-300 px-4 py-2 text-sm font-black text-emerald-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
-                                    >
-                                        {pendingAction === `save-${item.id}` ? "Sauvegarde..." : "Sauvegarder"}
-                                    </button>
-
-                                    <button
-                                        type="button"
                                         onClick={() => onDeletePlayer(item)}
                                         disabled={isPending}
                                         className="h-fit rounded-md bg-red-500/80 px-4 py-2 text-sm font-black text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:text-slate-200"
@@ -425,10 +460,27 @@ export default function PlayersAdminForm({ players, countries }: PlayersAdminFor
                     })}
                 </section>
 
+                <section className="flex flex-col gap-3 rounded-lg border border-white/15 bg-emerald-950/50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm font-semibold text-emerald-50/90">
+                        Modifications en attente: <span className="text-yellow-200">{changedItems.length}</span>
+                    </p>
+                    <button
+                        type="button"
+                        onClick={onSaveAllPlayers}
+                        disabled={isPending || changedItems.length === 0}
+                        className="rounded-md bg-yellow-300 px-5 py-3 text-sm font-black text-green-950 shadow-lg shadow-yellow-950/20 transition hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-yellow-100 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
+                    >
+                        {pendingAction === "save-all" ? "Enregistrement..." : "Sauvegarder les modifications"}
+                    </button>
+                </section>
+
                 <section className="rounded-lg border border-white/15 bg-emerald-950/50 p-4 text-sm font-semibold text-emerald-50/90">
-                    {result ? result.message : `${filteredItems.length} joueur(s) affiché(s) sur ${sortedItems.length}.`}
+                    {result
+                        ? result.message
+                        : `${filteredItems.length} joueur(s) affiche(s) sur ${sortedItems.length}.`}
                 </section>
             </div>
         </div>
     );
 }
+

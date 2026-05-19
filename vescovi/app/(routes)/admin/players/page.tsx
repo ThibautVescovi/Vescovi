@@ -28,10 +28,9 @@ export default async function AdminPlayersPage() {
         );
     }
 
-    return (
-        <PlayersAdminForm
-            players={playersResult.data ?? []}
-            countries={countriesResult.data ?? []}
-        />
-    );
+    const players = playersResult.data ?? [];
+    const countries = countriesResult.data ?? [];
+    const formKey = JSON.stringify(players.map((player) => [player.id, player.name, player.country_code, player.position]));
+
+    return <PlayersAdminForm key={formKey} players={players} countries={countries} />;
 }

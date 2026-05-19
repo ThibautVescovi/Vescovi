@@ -11,6 +11,7 @@ type RankingEntry = {
     pronostiqueurName: string;
     totalPoints: number;
     wineName: string | null;
+    isApproved: boolean;
 };
 
 function formatPronostiqueurName(firstName: string | null, lastName: string | null): string {
@@ -45,7 +46,7 @@ export default async function RankingPage() {
             user_id,
             total_points,
             profiles:user_id (first_name, last_name),
-            entries!entries_team_id_fkey (wine_name)
+            entries!entries_team_id_fkey (wine_name, is_approved)
         `)
         .order("total_points", { ascending: false });
 
@@ -62,6 +63,7 @@ export default async function RankingPage() {
             pronostiqueurName: formatPronostiqueurName(profile?.first_name ?? null, profile?.last_name ?? null),
             totalPoints: row.total_points ?? 0,
             wineName: entry?.wine_name ?? null,
+            isApproved: entry?.is_approved ?? false,
         };
     });
 
@@ -149,6 +151,7 @@ export default async function RankingPage() {
                                     <th className="px-6 py-4 text-left">#</th>
                                     <th className="px-6 py-4 text-left">Pronostiqueur</th>
                                     <th className="px-6 py-4 text-left">Équipe</th>
+                                    <th className="px-6 py-4 text-left">Validation</th>
                                     <th className="px-6 py-4 text-left">Vin engagé</th>
                                     <th className="px-6 py-4 text-right">Points</th>
                                 </tr>
@@ -182,6 +185,16 @@ export default async function RankingPage() {
                                                 >
                                                     {entry.teamName}
                                                 </Link>
+                                            </td>
+                                            <td className="px-6 py-4 text-sm">
+                                                <span
+                                                    className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${entry.isApproved
+                                                        ? "bg-emerald-400/20 text-emerald-200 ring-1 ring-emerald-300/30"
+                                                        : "bg-amber-400/20 text-amber-200 ring-1 ring-amber-300/30"
+                                                        }`}
+                                                >
+                                                    {entry.isApproved ? "Validée" : "En attente"}
+                                                </span>
                                             </td>
                                             <td className="px-6 py-4 text-emerald-50/60 text-sm italic">
                                                 {entry.wineName ? `🍾 ${entry.wineName}` : "–"}
@@ -226,6 +239,12 @@ export default async function RankingPage() {
                                             >
                                                 {entry.teamName}
                                             </Link>
+                                            <p className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${entry.isApproved
+                                                ? "bg-emerald-400/20 text-emerald-200 ring-1 ring-emerald-300/30"
+                                                : "bg-amber-400/20 text-amber-200 ring-1 ring-amber-300/30"
+                                                }`}>
+                                                {entry.isApproved ? "Validée" : "En attente"}
+                                            </p>
                                             {entry.wineName && (
                                                 <p className="text-xs text-emerald-50/50 italic truncate">🍾 {entry.wineName}</p>
                                             )}
@@ -268,4 +287,3 @@ export default async function RankingPage() {
         </div>
     );
 }
-
