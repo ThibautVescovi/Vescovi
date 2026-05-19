@@ -18,7 +18,11 @@ export default function Navbar({ canAccessAdmin }: NavbarProps) {
     const router = useRouter();
     const pathname = usePathname();
     const navItems = canAccessAdmin
-        ? [...baseNavItems, { label: "Admin points", href: "/admin/points", icon: "ADM" }]
+        ? [
+              ...baseNavItems,
+              { label: "Admin points", href: "/admin/points", icon: "ADM" },
+              { label: "Admin Players", href: "/admin/players", icon: "PLR" },
+          ]
         : baseNavItems;
 
     const handleLogout = async () => {

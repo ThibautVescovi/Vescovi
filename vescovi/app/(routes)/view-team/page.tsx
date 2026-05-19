@@ -768,27 +768,27 @@ export default async function ViewTeamPage({
                     {/* Panneau latéral */}
                     <div className="space-y-4 xl:sticky xl:top-24 xl:self-start">
                         {/* Résumé de l'équipe */}
-                        <div className="rounded-lg border border-white/15 bg-white/10 p-5 shadow-xl shadow-black/20">
-                            <h2 className="text-xl font-black">Composition</h2>
-                            <div className="mt-4 space-y-3">
-                                <div className="flex items-center justify-between rounded-md border border-red-500/50 bg-red-500/15 px-3 py-2">
-                                    <span className="text-sm font-semibold">Gardiens</span>
-                                    <span className="font-black text-red-300">1</span>
-                                </div>
-                                <div className="flex items-center justify-between rounded-md border border-blue-500/50 bg-blue-500/15 px-3 py-2">
-                                    <span className="text-sm font-semibold">Défenseurs</span>
-                                    <span className="font-black text-blue-300">4</span>
-                                </div>
-                                <div className="flex items-center justify-between rounded-md border border-purple-500/50 bg-purple-500/15 px-3 py-2">
-                                    <span className="text-sm font-semibold">Milieux</span>
-                                    <span className="font-black text-purple-300">3</span>
-                                </div>
-                                <div className="flex items-center justify-between rounded-md border border-yellow-500/50 bg-yellow-500/15 px-3 py-2">
-                                    <span className="text-sm font-semibold">Attaquants</span>
-                                    <span className="font-black text-yellow-300">3</span>
-                                </div>
-                            </div>
-                        </div>
+                        {/*<div className="rounded-lg border border-white/15 bg-white/10 p-5 shadow-xl shadow-black/20">*/}
+                        {/*    <h2 className="text-xl font-black">Composition</h2>*/}
+                        {/*    <div className="mt-4 space-y-3">*/}
+                        {/*        <div className="flex items-center justify-between rounded-md border border-red-500/50 bg-red-500/15 px-3 py-2">*/}
+                        {/*            <span className="text-sm font-semibold">Gardiens</span>*/}
+                        {/*            <span className="font-black text-red-300">1</span>*/}
+                        {/*        </div>*/}
+                        {/*        <div className="flex items-center justify-between rounded-md border border-blue-500/50 bg-blue-500/15 px-3 py-2">*/}
+                        {/*            <span className="text-sm font-semibold">Défenseurs</span>*/}
+                        {/*            <span className="font-black text-blue-300">4</span>*/}
+                        {/*        </div>*/}
+                        {/*        <div className="flex items-center justify-between rounded-md border border-purple-500/50 bg-purple-500/15 px-3 py-2">*/}
+                        {/*            <span className="text-sm font-semibold">Milieux</span>*/}
+                        {/*            <span className="font-black text-purple-300">3</span>*/}
+                        {/*        </div>*/}
+                        {/*        <div className="flex items-center justify-between rounded-md border border-yellow-500/50 bg-yellow-500/15 px-3 py-2">*/}
+                        {/*            <span className="text-sm font-semibold">Attaquants</span>*/}
+                        {/*            <span className="font-black text-yellow-300">3</span>*/}
+                        {/*        </div>*/}
+                        {/*    </div>*/}
+                        {/*</div>*/}
 
                         {/* Liste des joueurs par poste */}
                         <div className="rounded-lg border border-white/15 bg-white/10 p-5 shadow-xl shadow-black/20">
