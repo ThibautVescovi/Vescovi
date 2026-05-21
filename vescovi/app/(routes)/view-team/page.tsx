@@ -5,6 +5,7 @@ import { hasFlag } from "country-flag-icons";
 import { approveTeamEntry } from "./actions";
 
 type Position = "Gardien" | "Défenseur" | "Milieu" | "Attaquant";
+type PointsViewMode = "match" | "stage" | "total";
 
 type TeamPlayer = {
     id: string;
@@ -329,10 +330,18 @@ function formatPoints(value: number): string {
     return value > 0 ? `+${value}` : `${value}`;
 }
 
+function normalizePointsViewMode(value?: string): PointsViewMode {
+    if (value === "stage" || value === "total") {
+        return value;
+    }
+
+    return "match";
+}
+
 export default async function ViewTeamPage({
     searchParams,
 }: {
-    searchParams: Promise<{ userId?: string; teamId?: string }>;
+    searchParams: Promise<{ userId?: string; teamId?: string; view?: string }>;
 }) {
     const supabase = await createClient();
     const {
@@ -357,7 +366,8 @@ export default async function ViewTeamPage({
         );
     }
 
-    const { userId: targetUserId, teamId: targetTeamId } = await searchParams;
+    const { userId: targetUserId, teamId: targetTeamId, view } = await searchParams;
+    const pointsViewMode = normalizePointsViewMode(view);
 
     const { data: currentProfile } = await supabase
         .from("profiles")
@@ -653,6 +663,35 @@ export default async function ViewTeamPage({
         return aTime - bTime;
     });
 
+    const stageBuckets = new Map<string, { stageName: string; matchIds: string[]; sortTime: number }>();
+    for (const match of matches) {
+        const stageName = match.stage?.trim() || "Stage non defini";
+        const stageKey = stageName.toLocaleLowerCase("fr-FR");
+        const matchTime = match.match_date ? new Date(match.match_date).getTime() : Number.MAX_SAFE_INTEGER;
+        const existingStage = stageBuckets.get(stageKey);
+
+        if (existingStage) {
+            existingStage.matchIds.push(match.id);
+            existingStage.sortTime = Math.min(existingStage.sortTime, matchTime);
+            continue;
+        }
+
+        stageBuckets.set(stageKey, {
+            stageName,
+            matchIds: [match.id],
+            sortTime: matchTime,
+        });
+    }
+
+    const stageColumns = [...stageBuckets.entries()]
+        .sort((a, b) => a[1].sortTime - b[1].sortTime)
+        .map(([stageKey, stage], index) => ({
+            id: stageKey,
+            label: `Match ${index + 1}`,
+            stageName: stage.stageName,
+            matchIds: stage.matchIds,
+        }));
+
     const positionOrder: Position[] = ["Gardien", "Défenseur", "Milieu", "Attaquant"];
     const positionByPlayerId = new Map(teamPlayers11.map((player) => [player.id, player.position]));
     const pointsByPlayerId = new Map(
@@ -704,12 +743,49 @@ export default async function ViewTeamPage({
             };
         });
 
+    const teamPointsRowsWithStageTotals = teamPointsRows.map((row) => {
+        const byStage = stageColumns.reduce<Record<string, number>>((acc, stage) => {
+            acc[stage.id] = stage.matchIds.reduce((sum, matchId) => sum + (row.byMatch[matchId] ?? 0), 0);
+            return acc;
+        }, {});
+
+        return {
+            ...row,
+            byStage,
+        };
+    });
+
     const totalByMatch = matches.reduce<Record<string, number>>((acc, match) => {
-        acc[match.id] = teamPointsRows.reduce((sum, row) => sum + (row.byMatch[match.id] ?? 0), 0);
+        acc[match.id] = teamPointsRowsWithStageTotals.reduce((sum, row) => sum + (row.byMatch[match.id] ?? 0), 0);
         return acc;
     }, {});
 
-    const teamTotalPoints = teamPointsRows.reduce((sum, row) => sum + row.total, 0);
+    const totalByStage = stageColumns.reduce<Record<string, number>>((acc, stage) => {
+        acc[stage.id] = teamPointsRowsWithStageTotals.reduce((sum, row) => sum + (row.byStage[stage.id] ?? 0), 0);
+        return acc;
+    }, {});
+
+    const teamTotalPoints = teamPointsRowsWithStageTotals.reduce((sum, row) => sum + row.total, 0);
+
+    const viewParams = new URLSearchParams();
+    if (targetUserId) {
+        viewParams.set("userId", targetUserId);
+    }
+    if (targetTeamId) {
+        viewParams.set("teamId", targetTeamId);
+    }
+
+    const buildViewHref = (mode: PointsViewMode): string => {
+        const params = new URLSearchParams(viewParams);
+        params.set("view", mode);
+        const query = params.toString();
+        return query ? `/view-team?${query}` : "/view-team";
+    };
+
+    const getViewButtonClassName = (mode: PointsViewMode): string =>
+        mode === pointsViewMode
+            ? "rounded-full border border-yellow-200 bg-yellow-300 px-3 py-1.5 text-xs font-black uppercase tracking-[0.1em] text-emerald-950"
+            : "rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-xs font-black uppercase tracking-[0.1em] text-emerald-50/80 transition hover:bg-white/15";
 
     const approveEntryAction = async (): Promise<void> => {
         "use server";
@@ -770,7 +846,7 @@ export default async function ViewTeamPage({
 
                 <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
                     {/* Terrain de foot */}
-                    <div className="relative mx-auto aspect-[3/4] w-full max-w-[430px] rounded-lg border-4 border-white bg-gradient-to-b from-green-600 to-green-700 p-4 shadow-2xl shadow-black/50 sm:max-w-[500px] lg:max-w-[580px]">
+                    <div className="relative mx-auto aspect-[3/4] w-full max-w-[340px] rounded-lg border-4 border-white bg-gradient-to-b from-green-600 to-green-700 p-4 shadow-2xl shadow-black/50 sm:max-w-[390px] lg:max-w-[430px]">
                         {/* Ligne médiane */}
                         <div className="absolute left-1/2 top-0 bottom-0 w-1 -translate-x-1/2 bg-white opacity-40" />
 
@@ -879,8 +955,21 @@ export default async function ViewTeamPage({
                 </div>
 
                 <div className="mt-8 rounded-lg border border-white/15 bg-white/10 p-5 shadow-xl shadow-black/20">
-                    <h2 className="text-xl font-black">Points par joueur et par match</h2>
-                    {matches.length === 0 ? (
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <h2 className="text-xl font-black">Recapitulatif des points</h2>
+                        <div className="flex flex-wrap gap-2">
+                            <Link href={buildViewHref("match")} className={getViewButtonClassName("match")}>
+                                Par match
+                            </Link>
+                            <Link href={buildViewHref("stage")} className={getViewButtonClassName("stage")}>
+                                Par stage
+                            </Link>
+                            <Link href={buildViewHref("total")} className={getViewButtonClassName("total")}>
+                                Total
+                            </Link>
+                        </div>
+                    </div>
+                    {pointsViewMode !== "total" && matches.length === 0 ? (
                         <p className="mt-3 text-sm text-emerald-50/80">
                             Aucun match noté pour le moment.
                         </p>
@@ -891,46 +980,75 @@ export default async function ViewTeamPage({
                                     <tr className="text-left text-emerald-50/80">
                                         <th className="sticky left-0 z-10 bg-emerald-950/80 px-3 py-2">Joueur</th>
                                         <th className="px-3 py-2">Poste</th>
-                                        {matches.map((match) => (
-                                            <th key={match.id} className="min-w-[120px] px-2 py-2 text-center sm:min-w-[140px] sm:px-3">
-                                                <div className="font-semibold text-white">
-                                                    {match.team_home} - {match.team_away}
-                                                </div>
-                                                <div className="text-xs text-emerald-50/70">
-                                                    {match.match_date
-                                                        ? new Intl.DateTimeFormat("fr-FR", {
-                                                              day: "2-digit",
-                                                              month: "2-digit",
-                                                          }).format(new Date(match.match_date))
-                                                        : "Date inconnue"}
-                                                </div>
-                                            </th>
-                                        ))}
+                                        {pointsViewMode === "match"
+                                            ? matches.map((match) => (
+                                                  <th key={match.id} className="min-w-[120px] px-2 py-2 text-center sm:min-w-[140px] sm:px-3">
+                                                      <div className="font-semibold text-white">
+                                                          {match.team_home} - {match.team_away}
+                                                      </div>
+                                                      <div className="text-xs text-emerald-50/70">
+                                                          {match.match_date
+                                                              ? new Intl.DateTimeFormat("fr-FR", {
+                                                                    day: "2-digit",
+                                                                    month: "2-digit",
+                                                                }).format(new Date(match.match_date))
+                                                              : "Date inconnue"}
+                                                      </div>
+                                                  </th>
+                                              ))
+                                            : null}
+                                        {pointsViewMode === "stage"
+                                            ? stageColumns.map((stage) => (
+                                                  <th key={stage.id} className="min-w-[120px] px-2 py-2 text-center sm:min-w-[140px] sm:px-3">
+                                                      <div className="font-semibold text-white">{stage.label}</div>
+                                                      <div className="text-xs text-emerald-50/70">{stage.stageName}</div>
+                                                  </th>
+                                              ))
+                                            : null}
                                         <th className="px-3 py-2 text-right">Total</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/10">
-                                    {teamPointsRows.map((row) => (
+                                    {teamPointsRowsWithStageTotals.map((row) => (
                                         <tr key={row.id}>
                                             <td className="sticky left-0 z-10 bg-emerald-950/70 px-3 py-2 font-semibold">
                                                 {row.name}
                                             </td>
                                             <td className="px-3 py-2 text-emerald-50/80">{row.position}</td>
-                                            {matches.map((match) => {
-                                                const matchPoints = row.byMatch[match.id] ?? 0;
-                                                const pointsColor =
-                                                    matchPoints > 0
-                                                        ? "text-emerald-300"
-                                                        : matchPoints < 0
-                                                          ? "text-red-300"
-                                                          : "text-emerald-50/70";
+                                            {pointsViewMode === "match"
+                                                ? matches.map((match) => {
+                                                      const matchPoints = row.byMatch[match.id] ?? 0;
+                                                      const pointsColor =
+                                                          matchPoints > 0
+                                                              ? "text-emerald-300"
+                                                              : matchPoints < 0
+                                                                ? "text-red-300"
+                                                                : "text-emerald-50/70";
 
-                                                return (
-                                                    <td key={`${row.id}-${match.id}`} className={`px-2 py-2 text-center font-semibold sm:px-3 ${pointsColor}`}>
-                                                        {formatPoints(matchPoints)}
-                                                    </td>
-                                                );
-                                            })}
+                                                      return (
+                                                          <td key={`${row.id}-${match.id}`} className={`px-2 py-2 text-center font-semibold sm:px-3 ${pointsColor}`}>
+                                                              {formatPoints(matchPoints)}
+                                                          </td>
+                                                      );
+                                                  })
+                                                : null}
+                                            {pointsViewMode === "stage"
+                                                ? stageColumns.map((stage) => {
+                                                      const stagePoints = row.byStage[stage.id] ?? 0;
+                                                      const pointsColor =
+                                                          stagePoints > 0
+                                                              ? "text-emerald-300"
+                                                              : stagePoints < 0
+                                                                ? "text-red-300"
+                                                                : "text-emerald-50/70";
+
+                                                      return (
+                                                          <td key={`${row.id}-${stage.id}`} className={`px-2 py-2 text-center font-semibold sm:px-3 ${pointsColor}`}>
+                                                              {formatPoints(stagePoints)}
+                                                          </td>
+                                                      );
+                                                  })
+                                                : null}
                                             <td className="px-3 py-2 text-right font-black text-yellow-300">
                                                 {formatPoints(row.total)}
                                             </td>
@@ -943,11 +1061,20 @@ export default async function ViewTeamPage({
                                             Total match
                                         </td>
                                         <td className="px-3 py-2 text-emerald-50/70">Equipe</td>
-                                        {matches.map((match) => (
-                                            <td key={`total-${match.id}`} className="px-2 py-2 text-center font-black text-yellow-300 sm:px-3">
-                                                {formatPoints(totalByMatch[match.id] ?? 0)}
-                                            </td>
-                                        ))}
+                                        {pointsViewMode === "match"
+                                            ? matches.map((match) => (
+                                                  <td key={`total-${match.id}`} className="px-2 py-2 text-center font-black text-yellow-300 sm:px-3">
+                                                      {formatPoints(totalByMatch[match.id] ?? 0)}
+                                                  </td>
+                                              ))
+                                            : null}
+                                        {pointsViewMode === "stage"
+                                            ? stageColumns.map((stage) => (
+                                                  <td key={`total-${stage.id}`} className="px-2 py-2 text-center font-black text-yellow-300 sm:px-3">
+                                                      {formatPoints(totalByStage[stage.id] ?? 0)}
+                                                  </td>
+                                              ))
+                                            : null}
                                         <td className="px-3 py-2 text-right font-black text-yellow-300">
                                             {formatPoints(teamTotalPoints)}
                                         </td>
