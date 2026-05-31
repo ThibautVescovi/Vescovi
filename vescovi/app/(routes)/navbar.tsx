@@ -8,6 +8,7 @@ const baseNavItems = [
     { label: "Créer mon équipe", href: "/team", icon: "XI" },
     { label: "Mon équipe", href: "/view-team", icon: "ME" },
     { label: "Classement", href: "/ranking", icon: "#1" },
+    { label: "Règles", href: "/rules", icon: "RG" },
 ];
 
 type NavbarProps = {
