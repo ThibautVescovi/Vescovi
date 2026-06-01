@@ -104,6 +104,13 @@ export default function RulesPage() {
                         </ul>
                     </div>
                 </section>
+                <section className="mt-8 rounded-[1.5rem] border border-yellow-300/40 bg-yellow-300/10 p-5 text-yellow-100 shadow-lg shadow-yellow-500/10 sm:mt-10 sm:p-6">
+                    <p className="text-sm font-bold uppercase tracking-[0.24em]">Important</p>
+                    <p className="mt-2 text-sm leading-7 sm:text-base">
+                        On préfère une bouteille à 8€ achetée lors d'une rencontre avec viticulteur dans le sud-ouest qu'une bouteille à 15€ achetée en grande surface.
+                        L'idée est de partager des découvertes, faire connaitre votre région ou vos gouts, pas de payer 10 € pour jouer... Merci de votre compréhension et bon concours à tous !
+                    </p>
+                </section>
             </main>
         </div>
     );
