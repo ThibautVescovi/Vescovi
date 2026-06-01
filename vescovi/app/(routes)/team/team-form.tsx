@@ -434,7 +434,7 @@ export default function TeamForm({
                                 disabled={!canSubmit || isSaving}
                                 className="rounded-md bg-yellow-300 px-5 py-3 text-sm font-black text-green-950 shadow-lg shadow-yellow-950/20 transition hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-yellow-100 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
                             >
-                                {isSaving ? "Sauvegarde..." : "Valider mon équipe"}
+                                {isSaving ? "Sauvegarde..." : "Enregistrer mon équipe"}
                             </button>
                         </div>
                     </form>
