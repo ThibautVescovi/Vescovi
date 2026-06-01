@@ -108,7 +108,7 @@ export default function RulesPage() {
                     <p className="text-sm font-bold uppercase tracking-[0.24em]">Important</p>
                     <p className="mt-2 text-sm leading-7 sm:text-base">
                         On préfère une bouteille à 8€ achetée lors d'une rencontre avec viticulteur dans le sud-ouest qu'une bouteille à 15€ achetée en grande surface.
-                        L'idée est de partager des découvertes, faire connaitre votre région ou vos gouts, pas de payer 10 € pour jouer... Merci de votre compréhension et bon concours à tous !
+                        L'idée est de partager des découvertes, faire connaitre votre région ou vos goûts, pas de payer 10 € pour jouer... Merci de votre compréhension et bon concours à tous !
                     </p>
                 </section>
             </main>
