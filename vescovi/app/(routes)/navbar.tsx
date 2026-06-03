@@ -21,7 +21,7 @@ export default function Navbar({ canAccessAdmin }: NavbarProps) {
     const navItems = canAccessAdmin
         ? [
               ...baseNavItems,
-              { label: "Admin points", href: "/admin/points", icon: "ADM" },
+              { label: "Admin Points", href: "/admin/points", icon: "ADM" },
               { label: "Admin Players", href: "/admin/players", icon: "PLR" },
           ]
         : baseNavItems;

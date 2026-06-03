@@ -118,12 +118,13 @@ export default async function RankingPage() {
                                     <p className="mt-2 text-lg font-black text-white leading-tight">
                                         {entry.pronostiqueurName}
                                     </p>
-                                    <Link
-                                        href={`/view-team?teamId=${entry.teamId}&userId=${entry.userId}`}
-                                        className="block truncate text-sm text-emerald-50/70 underline-offset-2 transition hover:text-yellow-200 hover:underline"
-                                    >
-                                        {entry.teamName}
-                                    </Link>
+                                    <span >{entry.teamName}</span>
+                                    {/*<Link*/}
+                                    {/*    href={`/view-team?teamId=${entry.teamId}&userId=${entry.userId}`}*/}
+                                    {/*    className="block truncate text-sm text-emerald-50/70 underline-offset-2 transition hover:text-yellow-200 hover:underline"*/}
+                                    {/*>*/}
+                                    {/*    {entry.teamName}*/}
+                                    {/*</Link>*/}
                                     <p className="mt-3 text-3xl font-black text-yellow-300">
                                         {entry.totalPoints}
                                         <span className="ml-1 text-base font-semibold text-yellow-200/70">pts</span>
@@ -234,12 +235,13 @@ export default async function RankingPage() {
                                                     </span>
                                                 )}
                                             </p>
-                                            <Link
-                                                href={`/view-team?teamId=${entry.teamId}&userId=${entry.userId}`}
-                                                className="block truncate text-xs text-emerald-50/60 underline-offset-2 transition hover:text-yellow-200 hover:underline"
-                                            >
-                                                {entry.teamName}
-                                            </Link>
+                                            <span >{entry.teamName}</span>
+                                            {/*<Link*/}
+                                            {/*    href={`/view-team?teamId=${entry.teamId}&userId=${entry.userId}`}*/}
+                                            {/*    className="block truncate text-xs text-emerald-50/60 underline-offset-2 transition hover:text-yellow-200 hover:underline"*/}
+                                            {/*>*/}
+                                            {/*    {entry.teamName}*/}
+                                            {/*</Link>*/}
                                             <p className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${entry.isApproved
                                                 ? "bg-emerald-400/20 text-emerald-200 ring-1 ring-emerald-300/30"
                                                 : "bg-amber-400/20 text-amber-200 ring-1 ring-amber-300/30"
