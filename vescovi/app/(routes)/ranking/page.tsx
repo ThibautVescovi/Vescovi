@@ -179,12 +179,13 @@ export default async function RankingPage() {
                                                 )}
                                             </td>
                                             <td className="px-6 py-4 text-emerald-50/80 text-sm">
-                                                <Link
-                                                    href={`/view-team?teamId=${entry.teamId}&userId=${entry.userId}`}
-                                                    className="underline-offset-2 transition hover:text-yellow-200 hover:underline"
-                                                >
-                                                    {entry.teamName}
-                                                </Link>
+                                                <span className="underline-offset-2">{entry.teamName}</span>
+                                                {/*<Link*/}
+                                                {/*    href={`/view-team?teamId=${entry.teamId}&userId=${entry.userId}`}*/}
+                                                {/*    className="underline-offset-2 transition hover:text-yellow-200 hover:underline"*/}
+                                                {/*>*/}
+                                                {/*    {entry.teamName}*/}
+                                                {/*</Link>*/}
                                             </td>
                                             <td className="px-6 py-4 text-sm">
                                                 <span
