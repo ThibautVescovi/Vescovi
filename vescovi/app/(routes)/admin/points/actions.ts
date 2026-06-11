@@ -51,6 +51,7 @@ const ALLOWED_STAGES = [
 ] as const;
 
 type Stage = (typeof ALLOWED_STAGES)[number];
+const PLAYER_VALIDATION_CHUNK_SIZE = 150;
 
 function getAppearancePoints(appearance: Appearance) {
     if (appearance === "full") {
@@ -353,19 +354,28 @@ export async function savePointsForMatch(
     }
 
     const playerIds = Array.from(new Set(rows.map((row) => row.playerId).filter(Boolean)));
-    const { data: players, error: playersError } = await supabase
-        .from("players")
-        .select("id")
-        .in("id", playerIds);
+    const existingPlayerIds = new Set<string>();
 
-    if (playersError) {
-        return {
-            ok: false,
-            message: `Erreur de verification des joueurs: ${playersError.message}`,
-        };
+    for (let index = 0; index < playerIds.length; index += PLAYER_VALIDATION_CHUNK_SIZE) {
+        const chunk = playerIds.slice(index, index + PLAYER_VALIDATION_CHUNK_SIZE);
+        const { data: players, error: playersError } = await supabase
+            .from("players")
+            .select("id")
+            .in("id", chunk);
+
+        if (playersError) {
+            return {
+                ok: false,
+                message: `Erreur de verification des joueurs: ${playersError.message}`,
+            };
+        }
+
+        for (const player of players ?? []) {
+            existingPlayerIds.add(player.id);
+        }
     }
 
-    if (!players || players.length !== playerIds.length) {
+    if (existingPlayerIds.size !== playerIds.length) {
         return {
             ok: false,
             message: "Au moins un joueur est introuvable.",

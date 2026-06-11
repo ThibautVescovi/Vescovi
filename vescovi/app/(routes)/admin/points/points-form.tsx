@@ -243,6 +243,19 @@ export default function PointsForm({
         return new Set([selectedMatch.team_home, selectedMatch.team_away]);
     }, [selectedMatch]);
 
+    const countryFilterOptions = useMemo(() => {
+        if (!canEditPoints) {
+            return [] as Country[];
+        }
+
+        return countries
+            .filter((country) => selectedMatchCountryCodes.has(country.code))
+            .sort((a, b) => a.name.localeCompare(b.name, "fr-FR"));
+    }, [canEditPoints, countries, selectedMatchCountryCodes]);
+
+    const effectiveCountryFilter =
+        countryFilter === "ALL" || selectedMatchCountryCodes.has(countryFilter) ? countryFilter : "ALL";
+
     const playersWithMeta = useMemo(() => {
         return players
             .map((player) => ({
@@ -278,12 +291,19 @@ export default function PointsForm({
 
         return playersWithMeta.filter((player) => {
             const inSelectedMatchCountries = selectedMatchCountryCodes.has(player.country_code);
-            const countryOk = countryFilter === "ALL" || player.country_code === countryFilter;
+            const countryOk =
+                effectiveCountryFilter === "ALL" || player.country_code === effectiveCountryFilter;
             const positionOk =
                 positionFilter === "ALL" || player.normalizedPosition === positionFilter;
             return inSelectedMatchCountries && countryOk && positionOk;
         });
-    }, [canEditPoints, countryFilter, playersWithMeta, positionFilter, selectedMatchCountryCodes]);
+    }, [
+        canEditPoints,
+        effectiveCountryFilter,
+        playersWithMeta,
+        positionFilter,
+        selectedMatchCountryCodes,
+    ]);
 
     const editedCount = useMemo(() => {
         let total = 0;
@@ -520,20 +540,17 @@ export default function PointsForm({
                         <label className="text-sm font-semibold">
                             Filtre pays
                             <select
-                                value={countryFilter}
+                                value={effectiveCountryFilter}
                                 onChange={(event) => setCountryFilter(event.target.value)}
                                 disabled={!canEditPoints}
                                 className="mt-1 w-full rounded-md border border-white/20 bg-white px-3 py-2 text-slate-900"
                             >
-                                <option value="ALL">Tous les pays</option>
-                                {countries
-                                    .slice()
-                                    .sort((a, b) => a.name.localeCompare(b.name, "fr-FR"))
-                                    .map((country) => (
-                                        <option key={country.code} value={country.code}>
-                                            {country.name}
-                                        </option>
-                                    ))}
+                                <option value="ALL">Tous les pays du match</option>
+                                {countryFilterOptions.map((country) => (
+                                    <option key={country.code} value={country.code}>
+                                        {country.name}
+                                    </option>
+                                ))}
                             </select>
                         </label>
 
@@ -564,19 +581,19 @@ export default function PointsForm({
                                 Crée ou sélectionne un match pour commencer la saisie des points.
                             </div>
                         ) : null}
-                        <div className="overflow-x-auto">
+                        <div className="max-h-[70vh] overflow-auto">
                             <table className="min-w-[1050px] w-full text-left text-sm">
-                                <thead className="bg-emerald-950/70 text-xs uppercase tracking-[0.16em] text-emerald-100">
+                                <thead className="text-xs uppercase tracking-[0.16em] text-emerald-100">
                                     <tr>
-                                        <th className="px-3 py-3">Pays</th>
-                                        <th className="px-3 py-3">Poste</th>
-                                        <th className="px-3 py-3">Joueur</th>
-                                        <th className="px-3 py-3">Buts</th>
-                                        <th className="px-3 py-3">Buts encaissés</th>
-                                        <th className="px-3 py-3">CJ</th>
-                                        <th className="px-3 py-3">CR</th>
-                                        <th className="px-3 py-3">Présence</th>
-                                        <th className="px-3 py-3">Points</th>
+                                        <th className="sticky top-0 z-10 bg-emerald-950/95 px-3 py-3 backdrop-blur">Pays</th>
+                                        <th className="sticky top-0 z-10 bg-emerald-950/95 px-3 py-3 backdrop-blur">Poste</th>
+                                        <th className="sticky top-0 z-10 bg-emerald-950/95 px-3 py-3 backdrop-blur">Joueur</th>
+                                        <th className="sticky top-0 z-10 bg-emerald-950/95 px-3 py-3 backdrop-blur">Buts</th>
+                                        <th className="sticky top-0 z-10 bg-emerald-950/95 px-3 py-3 backdrop-blur">Buts encaissés</th>
+                                        <th className="sticky top-0 z-10 bg-emerald-950/95 px-3 py-3 backdrop-blur">CJ</th>
+                                        <th className="sticky top-0 z-10 bg-emerald-950/95 px-3 py-3 backdrop-blur">CR</th>
+                                        <th className="sticky top-0 z-10 bg-emerald-950/95 px-3 py-3 backdrop-blur">Présence</th>
+                                        <th className="sticky top-0 z-10 bg-emerald-950/95 px-3 py-3 backdrop-blur">Points</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/10">

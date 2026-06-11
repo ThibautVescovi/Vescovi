@@ -1072,14 +1072,6 @@ export default async function ViewTeamPage({
                                                       <div className="font-semibold text-white">
                                                           {match.team_home} - {match.team_away}
                                                       </div>
-                                                      <div className="text-xs text-emerald-50/70">
-                                                          {match.match_date
-                                                              ? new Intl.DateTimeFormat("fr-FR", {
-                                                                    day: "2-digit",
-                                                                    month: "2-digit",
-                                                                }).format(new Date(match.match_date))
-                                                              : "Date inconnue"}
-                                                      </div>
                                                   </th>
                                               ))
                                             : null}
