@@ -541,14 +541,6 @@ export default async function ViewTeamPage({
                     <p className="mt-3 text-base leading-7 text-emerald-50/80">
                         Ton équipe n&apos;a pas de joueurs. Va l&apos;éditer pour ajouter des joueurs.
                     </p>
-                    <div className="mt-8">
-                        <Link
-                            href="/team"
-                            className="inline-block rounded-md bg-yellow-300 px-6 py-3 text-base font-black text-green-950 shadow-lg shadow-yellow-950/20 transition hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-yellow-100"
-                        >
-                            Éditer mon équipe
-                        </Link>
-                    </div>
                 </div>
             </div>
         );
@@ -1045,16 +1037,6 @@ export default async function ViewTeamPage({
                                     ))}
                             </div>
                         </div>
-
-                        {/* Bouton d'édition */}
-                        {isOwnTeam && (
-                            <Link
-                                href="/team"
-                                className="block w-full rounded-md bg-yellow-300 px-5 py-3 text-center text-sm font-black text-green-950 shadow-lg shadow-yellow-950/20 transition hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-yellow-100"
-                            >
-                                Éditer mon équipe
-                            </Link>
-                        )}
                     </div>
                 </div>
 
