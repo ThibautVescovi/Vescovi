@@ -256,16 +256,16 @@ export default function TeamForm({
                 <section className="min-w-0">
                     <div className="mb-6">
                         <p className="text-sm font-bold uppercase tracking-[0.24em] text-yellow-200">
-                            Création d&apos;équipe
+                            Modification d&apos;équipe
                         </p>
                         <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">
                             Mon équipe
                         </h1>
-                        <p className="mt-3 max-w-3xl text-base leading-7 text-emerald-50/80">
-                            Compose ton XI de départ pour le concours. Chaque parieur engage une
-                            bouteille de vin de 10€, puis les bouteilles sont réparties entre les
-                            trois premiers selon le nombre de participants.
-                        </p>
+                        {/*<p className="mt-3 max-w-3xl text-base leading-7 text-emerald-50/80">*/}
+                        {/*    Compose ton XI de départ pour le concours. Chaque parieur engage une*/}
+                        {/*    bouteille de vin de 10€, puis les bouteilles sont réparties entre les*/}
+                        {/*    trois premiers selon le nombre de participants.*/}
+                        {/*</p>*/}
                     </div>
 
                     {loadError ? (
@@ -311,127 +311,127 @@ export default function TeamForm({
                             </label>
                         </div>
 
-                        <div className="overflow-hidden rounded-lg border border-white/15 bg-white/10 shadow-2xl shadow-black/25 backdrop-blur">
-                            <div className="hidden grid-cols-[150px_minmax(0,240px)_minmax(0,1fr)] gap-3 border-b border-white/10 bg-emerald-950/60 px-4 py-3 text-xs font-black uppercase tracking-[0.18em] text-emerald-100 md:grid">
-                                <span>Poste</span>
-                                <span>Nationalité</span>
-                                <span>Joueur</span>
-                            </div>
+                        {/*<div className="overflow-hidden rounded-lg border border-white/15 bg-white/10 shadow-2xl shadow-black/25 backdrop-blur">*/}
+                        {/*    <div className="hidden grid-cols-[150px_minmax(0,240px)_minmax(0,1fr)] gap-3 border-b border-white/10 bg-emerald-950/60 px-4 py-3 text-xs font-black uppercase tracking-[0.18em] text-emerald-100 md:grid">*/}
+                        {/*        <span>Poste</span>*/}
+                        {/*        <span>Nationalité</span>*/}
+                        {/*        <span>Joueur</span>*/}
+                        {/*    </div>*/}
 
-                            <div className="divide-y divide-white/10">
-                                {playerSlots.map((slot) => {
-                                    const selection = selections[slot.id];
-                                    const selectedCountryCode = selection.countryCode;
-                                    const availablePlayers = players.filter((player) => {
-                                        const matchesPosition =
-                                            normalizePosition(player.position) === slot.position;
-                                        const matchesCountry =
-                                            !selectedCountryCode ||
-                                            player.country_code === selectedCountryCode;
-                                        const isAlreadySelected =
-                                            selectedPlayerIds.has(player.id) &&
-                                            selection.playerId !== player.id;
+                        {/*    <div className="divide-y divide-white/10">*/}
+                        {/*        {playerSlots.map((slot) => {*/}
+                        {/*            const selection = selections[slot.id];*/}
+                        {/*            const selectedCountryCode = selection.countryCode;*/}
+                        {/*            const availablePlayers = players.filter((player) => {*/}
+                        {/*                const matchesPosition =*/}
+                        {/*                    normalizePosition(player.position) === slot.position;*/}
+                        {/*                const matchesCountry =*/}
+                        {/*                    !selectedCountryCode ||*/}
+                        {/*                    player.country_code === selectedCountryCode;*/}
+                        {/*                const isAlreadySelected =*/}
+                        {/*                    selectedPlayerIds.has(player.id) &&*/}
+                        {/*                    selection.playerId !== player.id;*/}
 
-                                        return matchesPosition && matchesCountry && !isAlreadySelected;
-                                    });
-                                    const availableCountryCodes = new Set(
-                                        players
-                                            .filter(
-                                                (player) =>
-                                                    normalizePosition(player.position) === slot.position,
-                                            )
-                                            .map((player) => player.country_code)
-                                            .filter(Boolean),
-                                    );
-                                    const availableCountries = countriesWithPlayers.filter((country) =>
-                                        availableCountryCodes.has(country.code),
-                                    );
-                                    const hasCountry = Boolean(selectedCountryCode);
+                        {/*                return matchesPosition && matchesCountry && !isAlreadySelected;*/}
+                        {/*            });*/}
+                        {/*            const availableCountryCodes = new Set(*/}
+                        {/*                players*/}
+                        {/*                    .filter(*/}
+                        {/*                        (player) =>*/}
+                        {/*                            normalizePosition(player.position) === slot.position,*/}
+                        {/*                    )*/}
+                        {/*                    .map((player) => player.country_code)*/}
+                        {/*                    .filter(Boolean),*/}
+                        {/*            );*/}
+                        {/*            const availableCountries = countriesWithPlayers.filter((country) =>*/}
+                        {/*                availableCountryCodes.has(country.code),*/}
+                        {/*            );*/}
+                        {/*            const hasCountry = Boolean(selectedCountryCode);*/}
 
-                                    return (
-                                        <div
-                                            key={slot.id}
-                                            className="grid gap-3 px-4 py-4 md:grid-cols-[150px_minmax(0,240px)_minmax(0,1fr)] md:items-center"
-                                        >
-                                            <div>
-                                                <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-100/70 md:hidden">
-                                                    Poste
-                                                </p>
-                                                <div className="mt-1 flex items-center gap-2 md:mt-0">
-                                                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-yellow-300 text-xs font-black text-green-950">
-                                                        {slot.position === "Gardien"
-                                                            ? "G"
-                                                            : slot.position === "Défenseur"
-                                                              ? "D"
-                                                              : slot.position === "Milieu"
-                                                                ? "M"
-                                                                : "A"}
-                                                    </span>
-                                                    <span className="font-bold">{slot.label}</span>
-                                                </div>
-                                            </div>
+                        {/*            return (*/}
+                        {/*                <div*/}
+                        {/*                    key={slot.id}*/}
+                        {/*                    className="grid gap-3 px-4 py-4 md:grid-cols-[150px_minmax(0,240px)_minmax(0,1fr)] md:items-center"*/}
+                        {/*                >*/}
+                        {/*                    <div>*/}
+                        {/*                        <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-100/70 md:hidden">*/}
+                        {/*                            Poste*/}
+                        {/*                        </p>*/}
+                        {/*                        <div className="mt-1 flex items-center gap-2 md:mt-0">*/}
+                        {/*                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-yellow-300 text-xs font-black text-green-950">*/}
+                        {/*                                {slot.position === "Gardien"*/}
+                        {/*                                    ? "G"*/}
+                        {/*                                    : slot.position === "Défenseur"*/}
+                        {/*                                      ? "D"*/}
+                        {/*                                      : slot.position === "Milieu"*/}
+                        {/*                                        ? "M"*/}
+                        {/*                                        : "A"}*/}
+                        {/*                            </span>*/}
+                        {/*                            <span className="font-bold">{slot.label}</span>*/}
+                        {/*                        </div>*/}
+                        {/*                    </div>*/}
 
-                                            <label className="block">
-                                                <span className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-100/70 md:hidden">
-                                                    Nationalité
-                                                </span>
-                                                <select
-                                                    value={selection.countryCode}
-                                                    onChange={(event) =>
-                                                        updateCountry(slot.id, event.target.value)
-                                                    }
-                                                    className="mt-1 w-full rounded-md border border-white/15 bg-white px-3 py-3 text-sm font-semibold text-slate-950 outline-none transition focus:border-yellow-300 focus:ring-2 focus:ring-yellow-300/60 md:mt-0"
-                                                >
-                                                    <option value="">Choisir un pays</option>
-                                                    {availableCountries.map((country) => (
-                                                        <option key={country.code} value={country.code}>
-                                                            {country.name}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </label>
+                        {/*                    <label className="block">*/}
+                        {/*                        <span className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-100/70 md:hidden">*/}
+                        {/*                            Nationalité*/}
+                        {/*                        </span>*/}
+                        {/*                        <select*/}
+                        {/*                            value={selection.countryCode}*/}
+                        {/*                            onChange={(event) =>*/}
+                        {/*                                updateCountry(slot.id, event.target.value)*/}
+                        {/*                            }*/}
+                        {/*                            className="mt-1 w-full rounded-md border border-white/15 bg-white px-3 py-3 text-sm font-semibold text-slate-950 outline-none transition focus:border-yellow-300 focus:ring-2 focus:ring-yellow-300/60 md:mt-0"*/}
+                        {/*                        >*/}
+                        {/*                            <option value="">Choisir un pays</option>*/}
+                        {/*                            {availableCountries.map((country) => (*/}
+                        {/*                                <option key={country.code} value={country.code}>*/}
+                        {/*                                    {country.name}*/}
+                        {/*                                </option>*/}
+                        {/*                            ))}*/}
+                        {/*                        </select>*/}
+                        {/*                    </label>*/}
 
-                                            <label className="block">
-                                                <span className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-100/70 md:hidden">
-                                                    Joueur
-                                                </span>
-                                                <select
-                                                    value={selection.playerId}
-                                                    onChange={(event) =>
-                                                        updatePlayer(slot.id, event.target.value)
-                                                    }
-                                                    disabled={!hasCountry}
-                                                    className="mt-1 w-full rounded-md border border-white/15 bg-white px-3 py-3 text-sm font-semibold text-slate-950 outline-none transition focus:border-yellow-300 focus:ring-2 focus:ring-yellow-300/60 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 md:mt-0"
-                                                >
-                                                    <option value="">
-                                                        {hasCountry
-                                                            ? "Sélectionner un joueur"
-                                                            : "Choisir un pays d'abord"}
-                                                    </option>
-                                                    {availablePlayers.map((player) => (
-                                                        <option key={player.id} value={player.id}>
-                                                            {player.name}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </label>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
+                        {/*                    <label className="block">*/}
+                        {/*                        <span className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-100/70 md:hidden">*/}
+                        {/*                            Joueur*/}
+                        {/*                        </span>*/}
+                        {/*                        <select*/}
+                        {/*                            value={selection.playerId}*/}
+                        {/*                            onChange={(event) =>*/}
+                        {/*                                updatePlayer(slot.id, event.target.value)*/}
+                        {/*                            }*/}
+                        {/*                            disabled={!hasCountry}*/}
+                        {/*                            className="mt-1 w-full rounded-md border border-white/15 bg-white px-3 py-3 text-sm font-semibold text-slate-950 outline-none transition focus:border-yellow-300 focus:ring-2 focus:ring-yellow-300/60 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 md:mt-0"*/}
+                        {/*                        >*/}
+                        {/*                            <option value="">*/}
+                        {/*                                {hasCountry*/}
+                        {/*                                    ? "Sélectionner un joueur"*/}
+                        {/*                                    : "Choisir un pays d'abord"}*/}
+                        {/*                            </option>*/}
+                        {/*                            {availablePlayers.map((player) => (*/}
+                        {/*                                <option key={player.id} value={player.id}>*/}
+                        {/*                                    {player.name}*/}
+                        {/*                                </option>*/}
+                        {/*                            ))}*/}
+                        {/*                        </select>*/}
+                        {/*                    </label>*/}
+                        {/*                </div>*/}
+                        {/*            );*/}
+                        {/*        })}*/}
+                        {/*    </div>*/}
+                        {/*</div>*/}
 
                         <div className="flex flex-col gap-3 rounded-lg border border-white/15 bg-emerald-950/50 p-4 sm:flex-row sm:items-center sm:justify-between">
-                            <p className="text-sm font-semibold text-emerald-50/85">
-                                {saveResult
-                                    ? saveResult.message
-                                    : canSubmit
-                                      ? "Toutes les règles sont respectées."
-                                      : "Choisis une nationalité puis un joueur pour chaque poste."}
-                            </p>
+                            {/*<p className="text-sm font-semibold text-emerald-50/85">*/}
+                            {/*    {saveResult*/}
+                            {/*        ? saveResult.message*/}
+                            {/*        : canSubmit*/}
+                            {/*          ? "Toutes les règles sont respectées."*/}
+                            {/*          : "Choisis une nationalité puis un joueur pour chaque poste."}*/}
+                            {/*</p>*/}
                             <button
                                 type="submit"
-                                disabled={true}
+                                disabled={!canSubmit || isSaving}
                                 className="rounded-md bg-yellow-300 px-5 py-3 text-sm font-black text-green-950 shadow-lg shadow-yellow-950/20 transition hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-yellow-100 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
                             >
                                 {isSaving ? "Sauvegarde..." : "Enregistrer mon équipe"}
@@ -440,48 +440,48 @@ export default function TeamForm({
                     </form>
                 </section>
 
-                <aside className="space-y-4 lg:sticky lg:top-28 lg:self-start">
-                    <section className="rounded-lg border border-yellow-300/30 bg-yellow-300/10 p-5 shadow-xl shadow-black/20">
-                        <h2 className="text-xl font-black text-yellow-100">Rappel des règles</h2>
-                        <ul className="mt-4 space-y-3">
-                            {rules.map((rule) => (
-                                <li
-                                    key={rule}
-                                    className="flex gap-3 text-sm font-semibold text-emerald-50/90"
-                                >
-                                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-yellow-300 text-[11px] font-black text-green-950">
-                                        ✓
-                                    </span>
-                                    <span>{rule}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </section>
+                {/*<aside className="space-y-4 lg:sticky lg:top-28 lg:self-start">*/}
+                {/*    <section className="rounded-lg border border-yellow-300/30 bg-yellow-300/10 p-5 shadow-xl shadow-black/20">*/}
+                {/*        <h2 className="text-xl font-black text-yellow-100">Rappel des règles</h2>*/}
+                {/*        <ul className="mt-4 space-y-3">*/}
+                {/*            {rules.map((rule) => (*/}
+                {/*                <li*/}
+                {/*                    key={rule}*/}
+                {/*                    className="flex gap-3 text-sm font-semibold text-emerald-50/90"*/}
+                {/*                >*/}
+                {/*                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-yellow-300 text-[11px] font-black text-green-950">*/}
+                {/*                        ✓*/}
+                {/*                    </span>*/}
+                {/*                    <span>{rule}</span>*/}
+                {/*                </li>*/}
+                {/*            ))}*/}
+                {/*        </ul>*/}
+                {/*    </section>*/}
 
-                    <section className="rounded-lg border border-white/15 bg-white/10 p-5 shadow-xl shadow-black/20">
-                        <h2 className="text-xl font-black">Contrôle</h2>
-                        <div className="mt-4 space-y-3">
-                            <RuleStatus
-                                valid={stats.completedCount === 11}
-                                label={`${stats.completedCount}/11 joueurs complétés`}
-                            />
-                            <RuleStatus
-                                valid={stats.hasEnoughNationalities}
-                                label={`${stats.nationalityCount}/5 nationalités minimum`}
-                            />
-                            <RuleStatus
-                                valid={stats.respectsNationalityLimit}
-                                label="Maximum 3 joueurs par nationalité"
-                            />
-                        </div>
+                {/*    <section className="rounded-lg border border-white/15 bg-white/10 p-5 shadow-xl shadow-black/20">*/}
+                {/*        <h2 className="text-xl font-black">Contrôle</h2>*/}
+                {/*        <div className="mt-4 space-y-3">*/}
+                {/*            <RuleStatus*/}
+                {/*                valid={stats.completedCount === 11}*/}
+                {/*                label={`${stats.completedCount}/11 joueurs complétés`}*/}
+                {/*            />*/}
+                {/*            <RuleStatus*/}
+                {/*                valid={stats.hasEnoughNationalities}*/}
+                {/*                label={`${stats.nationalityCount}/5 nationalités minimum`}*/}
+                {/*            />*/}
+                {/*            <RuleStatus*/}
+                {/*                valid={stats.respectsNationalityLimit}*/}
+                {/*                label="Maximum 3 joueurs par nationalité"*/}
+                {/*            />*/}
+                {/*        </div>*/}
 
-                        {stats.overLimitNationalities.length > 0 ? (
-                            <p className="mt-4 rounded-md border border-red-300/50 bg-red-500/15 p-3 text-sm font-semibold text-red-100">
-                                Trop de joueurs pour : {stats.overLimitNationalities.join(", ")}.
-                            </p>
-                        ) : null}
-                    </section>
-                </aside>
+                {/*        {stats.overLimitNationalities.length > 0 ? (*/}
+                {/*            <p className="mt-4 rounded-md border border-red-300/50 bg-red-500/15 p-3 text-sm font-semibold text-red-100">*/}
+                {/*                Trop de joueurs pour : {stats.overLimitNationalities.join(", ")}.*/}
+                {/*            </p>*/}
+                {/*        ) : null}*/}
+                {/*    </section>*/}
+                {/*</aside>*/}
             </div>
         </div>
     );
