@@ -634,14 +634,13 @@ export default async function ViewTeamPage({
     const playerPerformances = (playerPerformancesData ?? []) as PlayerPerformanceRow[];
     const matchIds = Array.from(new Set(playerPerformances.map((row) => row.match_id)));
 
-    const { data: matchesData, error: matchesError } = matchIds.length
-        ? await supabase
-              .from("matches")
-              .select("id, team_home, team_away, match_date, stage")
-              .in("id", matchIds)
-        : { data: [], error: null };
+    // Charger TOUS les matchs pour déterminer les phases correctement
+    const { data: allMatchesData, error: allMatchesError } = await supabase
+        .from("matches")
+        .select("id, team_home, team_away, match_date, stage")
+        .order("match_date", { ascending: true });
 
-    if (matchesError) {
+    if (allMatchesError) {
         return (
             <div className="min-h-[calc(100vh-80px)] bg-[linear-gradient(180deg,#052e16_0%,#0f3d2e_48%,#111827_100%)] px-4 py-8 text-white sm:px-6 lg:px-8">
                 <div className="mx-auto max-w-2xl text-center">
@@ -651,7 +650,61 @@ export default async function ViewTeamPage({
                     <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">
                         Erreur de chargement
                     </h1>
-                    <p className="mt-3 text-base leading-7 text-red-200">{matchesError.message}</p>
+                    <p className="mt-3 text-base leading-7 text-red-200">{allMatchesError.message}</p>
+                </div>
+            </div>
+        );
+    }
+
+    const allMatches = ((allMatchesData ?? []) as MatchRow[]).sort((a, b) => {
+        const aTime = a.match_date ? new Date(a.match_date).getTime() : 0;
+        const bTime = b.match_date ? new Date(b.match_date).getTime() : 0;
+        return aTime - bTime;
+    });
+
+    const matchesDataBasedOnPerformances = matchIds.length
+        ? await supabase
+              .from("matches")
+              .select("id, team_home, team_away, match_date, stage")
+              .in("id", matchIds)
+        : { data: [], error: null };
+
+    if (matchesDataBasedOnPerformances.error) {
+        return (
+            <div className="min-h-[calc(100vh-80px)] bg-[linear-gradient(180deg,#052e16_0%,#0f3d2e_48%,#111827_100%)] px-4 py-8 text-white sm:px-6 lg:px-8">
+                <div className="mx-auto max-w-2xl text-center">
+                    <p className="text-sm font-bold uppercase tracking-[0.24em] text-yellow-200">
+                        Erreur
+                    </p>
+                    <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">
+                        Erreur de chargement
+                    </h1>
+                    <p className="mt-3 text-base leading-7 text-red-200">{matchesDataBasedOnPerformances.error.message}</p>
+                </div>
+            </div>
+        );
+    }
+
+    const matchesData = matchesDataBasedOnPerformances.data;
+
+    // Charger les changements d'équipe
+    const { data: teamChangesData, error: teamChangesError } = await supabase
+        .from("team_changes")
+        .select("player_out_id, player_in_id, created_at")
+        .eq("team_id", existingTeam.id)
+        .order("created_at", { ascending: true });
+
+    if (teamChangesError) {
+        return (
+            <div className="min-h-[calc(100vh-80px)] bg-[linear-gradient(180deg,#052e16_0%,#0f3d2e_48%,#111827_100%)] px-4 py-8 text-white sm:px-6 lg:px-8">
+                <div className="mx-auto max-w-2xl text-center">
+                    <p className="text-sm font-bold uppercase tracking-[0.24em] text-yellow-200">
+                        Erreur
+                    </p>
+                    <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">
+                        Erreur de chargement
+                    </h1>
+                    <p className="mt-3 text-base leading-7 text-red-200">{teamChangesError.message}</p>
                 </div>
             </div>
         );
@@ -663,8 +716,10 @@ export default async function ViewTeamPage({
         return aTime - bTime;
     });
 
+    // ...existing code...
+
     const stageBuckets = new Map<string, { stageName: string; matchIds: string[]; sortTime: number }>();
-    for (const match of matches) {
+    for (const match of allMatches) {
         const stageName = match.stage?.trim() || "Stage non defini";
         const stageKey = stageName.toLocaleLowerCase("fr-FR");
         const matchTime = match.match_date ? new Date(match.match_date).getTime() : Number.MAX_SAFE_INTEGER;
@@ -690,7 +745,33 @@ export default async function ViewTeamPage({
             label: `Match ${index + 1}`,
             stageName: stage.stageName,
             matchIds: stage.matchIds,
+            stageIndex: index,
         }));
+
+    // Créer une map des changements d'équipe
+    const teamChanges = (teamChangesData ?? []) as Array<{
+        player_out_id: string | null;
+        player_in_id: string | null;
+        created_at: string | null;
+    }>;
+
+    // Créer une map player -> stage index après lequel il entre
+    const playerEntryStageIndex = new Map<string, number>();
+    for (const change of teamChanges) {
+        if (change.player_in_id) {
+            // Le joueur entrant commence à partir de la 4e phase (index 3)
+            playerEntryStageIndex.set(change.player_in_id, 3);
+        }
+    }
+
+    // Créer une map player -> stage index jusqu'auquel il peut jouer
+    const playerExitStageIndex = new Map<string, number>();
+    for (const change of teamChanges) {
+        if (change.player_out_id) {
+            // Le joueur sortant joue jusqu'à la 3e phase incluse (index 2)
+            playerExitStageIndex.set(change.player_out_id, 2);
+        }
+    }
 
     const positionOrder: Position[] = ["Gardien", "Défenseur", "Milieu", "Attaquant"];
     const positionByPlayerId = new Map(teamPlayers11.map((player) => [player.id, player.position]));
@@ -704,10 +785,33 @@ export default async function ViewTeamPage({
         ]),
     );
 
+    // Créer une map match -> stage index
+    const matchToStageIndex = new Map<string, number>();
+    for (const stage of stageColumns) {
+        for (const matchId of stage.matchIds) {
+            matchToStageIndex.set(matchId, stage.stageIndex);
+        }
+    }
+
     for (const performance of playerPerformances) {
         const position = positionByPlayerId.get(performance.player_id);
 
         if (!position) {
+            continue;
+        }
+
+        // Déterminer si ce joueur peut compter ses points pour ce match
+        const matchStageIndex = matchToStageIndex.get(performance.match_id) ?? 0;
+        const exitStageIndex = playerExitStageIndex.get(performance.player_id);
+        const entryStageIndex = playerEntryStageIndex.get(performance.player_id);
+
+        // Si c'est un joueur sortant, il ne compte que jusqu'à la phase 3 (index 2)
+        if (exitStageIndex !== undefined && matchStageIndex > exitStageIndex) {
+            continue;
+        }
+
+        // Si c'est un joueur entrant, il ne compte que à partir de la phase 4 (index 3)
+        if (entryStageIndex !== undefined && matchStageIndex < entryStageIndex) {
             continue;
         }
 

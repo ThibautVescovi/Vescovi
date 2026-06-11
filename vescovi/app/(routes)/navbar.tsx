@@ -6,7 +6,6 @@ import { supabaseClient } from "@/lib/supabaseClient";
 
 const baseNavItems = [
     { label: "Règles", href: "/rules", icon: "RG" },
-    { label: "Créer mon équipe", href: "/team", icon: "XI" },
     { label: "Mon équipe", href: "/view-team", icon: "ME" },
     { label: "Classement", href: "/ranking", icon: "#1" },
 ];
@@ -22,7 +21,7 @@ export default function Navbar({ canAccessAdmin }: NavbarProps) {
         ? [
               ...baseNavItems,
               { label: "Admin Points", href: "/admin/points", icon: "ADM" },
-              { label: "Admin Players", href: "/admin/players", icon: "PLR" },
+              { label: "Changements", href: "/admin/changes", icon: "CHG" },
           ]
         : baseNavItems;
 
