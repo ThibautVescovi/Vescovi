@@ -708,6 +708,23 @@ export default async function ViewTeamPage({
         return aTime - bTime;
     });
 
+    // Seuls les matchs où au moins un joueur de l'équipe a réellement participé
+    const relevantMatchIds = new Set(
+        playerPerformances
+            .filter(
+                (p) =>
+                    p.is_starter ||
+                    p.is_substitute_in ||
+                    p.played_full_match ||
+                    (p.goals ?? 0) > 0 ||
+                    (p.goals_conceded ?? 0) > 0 ||
+                    (p.yellow_cards ?? 0) > 0 ||
+                    (p.red_cards ?? 0) > 0,
+            )
+            .map((p) => p.match_id),
+    );
+    const relevantMatches = matches.filter((m) => relevantMatchIds.has(m.id));
+
     // ...existing code...
 
     const stageBuckets = new Map<string, { stageName: string; matchIds: string[]; sortTime: number }>();
@@ -851,7 +868,7 @@ export default async function ViewTeamPage({
         };
     });
 
-    const totalByMatch = matches.reduce<Record<string, number>>((acc, match) => {
+    const totalByMatch = relevantMatches.reduce<Record<string, number>>((acc, match) => {
         acc[match.id] = teamPointsRowsWithStageTotals.reduce((sum, row) => sum + (row.byMatch[match.id] ?? 0), 0);
         return acc;
     }, {});
@@ -1055,7 +1072,7 @@ export default async function ViewTeamPage({
                             </Link>
                         </div>
                     </div>
-                    {pointsViewMode !== "total" && matches.length === 0 ? (
+                    {pointsViewMode !== "total" && relevantMatches.length === 0 && stageColumns.length === 0 ? (
                         <p className="mt-3 text-sm text-emerald-50/80">
                             Aucun match noté pour le moment.
                         </p>
@@ -1067,7 +1084,7 @@ export default async function ViewTeamPage({
                                         <th className="sticky left-0 z-10 bg-emerald-950/80 px-3 py-2">Joueur</th>
                                         <th className="px-3 py-2">Poste</th>
                                         {pointsViewMode === "match"
-                                            ? matches.map((match) => (
+                                            ? relevantMatches.map((match) => (
                                                   <th key={match.id} className="min-w-[120px] px-2 py-2 text-center sm:min-w-[140px] sm:px-3">
                                                       <div className="font-semibold text-white">
                                                           {match.team_home} - {match.team_away}
@@ -1094,7 +1111,7 @@ export default async function ViewTeamPage({
                                             </td>
                                             <td className="px-3 py-2 text-emerald-50/80">{row.position}</td>
                                             {pointsViewMode === "match"
-                                                ? matches.map((match) => {
+                                                ? relevantMatches.map((match) => {
                                                       const matchPoints = row.byMatch[match.id] ?? 0;
                                                       const pointsColor =
                                                           matchPoints > 0
@@ -1140,7 +1157,7 @@ export default async function ViewTeamPage({
                                         </td>
                                         <td className="px-3 py-2 text-emerald-50/70">Equipe</td>
                                         {pointsViewMode === "match"
-                                            ? matches.map((match) => (
+                                            ? relevantMatches.map((match) => (
                                                   <td key={`total-${match.id}`} className="px-2 py-2 text-center font-black text-yellow-300 sm:px-3">
                                                       {formatPoints(totalByMatch[match.id] ?? 0)}
                                                   </td>

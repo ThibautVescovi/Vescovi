@@ -74,6 +74,7 @@ type PointsFormProps = {
     countries: Country[];
     matches: Match[];
     existingPoints: ExistingPoint[];
+    playerUsageCounts: Record<string, number>;
     selectedMatchId: string;
 };
 
@@ -176,17 +177,23 @@ function getDatetimeLocalDefault() {
     return `${year}-${month}-${day}T${hours}:00`;
 }
 
+function formatUsageLabel(count: number) {
+    return count > 1 ? `${count} équipes` : `${count} équipe`;
+}
+
 export default function PointsForm({
     players,
     countries,
     matches,
     existingPoints,
+    playerUsageCounts,
     selectedMatchId,
 }: PointsFormProps) {
     const router = useRouter();
     const [currentMatchId, setCurrentMatchId] = useState(selectedMatchId);
     const [countryFilter, setCountryFilter] = useState("ALL");
     const [positionFilter, setPositionFilter] = useState<Position | "ALL">("ALL");
+    const [showOnlyParticipantPlayers, setShowOnlyParticipantPlayers] = useState(true);
     const [isPending, startTransition] = useTransition();
     const [result, setResult] = useState<SavePointsResult | null>(null);
     const [newHomeTeam, setNewHomeTeam] = useState(() => countries[0]?.code ?? "");
@@ -262,6 +269,8 @@ export default function PointsForm({
                 ...player,
                 normalizedPosition: normalizePosition(player.position),
                 countryName: countriesByCode.get(player.country_code) ?? player.country_code,
+                usageCount: playerUsageCounts[player.id] ?? 0,
+                isInParticipantTeam: (playerUsageCounts[player.id] ?? 0) > 0,
             }))
             .filter((player) => Boolean(player.normalizedPosition))
             .sort((a, b) => {
@@ -282,7 +291,18 @@ export default function PointsForm({
 
                 return a.name.localeCompare(b.name, "fr-FR");
             });
-    }, [countriesByCode, players]);
+    }, [countriesByCode, playerUsageCounts, players]);
+
+    const participantPlayersInSelectedMatchCount = useMemo(() => {
+        if (!canEditPoints) {
+            return 0;
+        }
+
+        return playersWithMeta.filter(
+            (player) =>
+                player.isInParticipantTeam && selectedMatchCountryCodes.has(player.country_code),
+        ).length;
+    }, [canEditPoints, playersWithMeta, selectedMatchCountryCodes]);
 
     const filteredPlayers = useMemo(() => {
         if (!canEditPoints) {
@@ -295,7 +315,8 @@ export default function PointsForm({
                 effectiveCountryFilter === "ALL" || player.country_code === effectiveCountryFilter;
             const positionOk =
                 positionFilter === "ALL" || player.normalizedPosition === positionFilter;
-            return inSelectedMatchCountries && countryOk && positionOk;
+            const participantOk = !showOnlyParticipantPlayers || player.isInParticipantTeam;
+            return inSelectedMatchCountries && countryOk && positionOk && participantOk;
         });
     }, [
         canEditPoints,
@@ -303,6 +324,7 @@ export default function PointsForm({
         playersWithMeta,
         positionFilter,
         selectedMatchCountryCodes,
+        showOnlyParticipantPlayers,
     ]);
 
     const editedCount = useMemo(() => {
@@ -573,6 +595,25 @@ export default function PointsForm({
                         <div className="rounded-md border border-white/15 bg-white/5 px-3 py-2 text-xs text-emerald-100/85">
                             Clean sheet automatique pour gardiens et défenseurs ayant joué avec 0 but encaissé.
                         </div>
+
+                        <div className="rounded-md border border-yellow-300/25 bg-yellow-300/10 px-3 py-3 text-sm text-yellow-50">
+                            <label className="flex cursor-pointer items-start gap-3">
+                                <input
+                                    type="checkbox"
+                                    checked={showOnlyParticipantPlayers}
+                                    onChange={(event) => setShowOnlyParticipantPlayers(event.target.checked)}
+                                    className="mt-0.5 h-4 w-4 rounded border-yellow-200/70 text-emerald-950 focus:ring-yellow-200"
+                                />
+                                <span>
+                                    <span className="block font-bold">Masquer les joueurs hors équipes</span>
+                                    <span className="mt-1 block text-xs text-yellow-100/85">
+                                        {canEditPoints
+                                            ? `${participantPlayersInSelectedMatchCount} joueur${participantPlayersInSelectedMatchCount > 1 ? "s" : ""} du match sont actuellement sélectionnés par au moins une équipe participante.`
+                                            : "Active ce filtre dès qu'un match est sélectionné."}
+                                    </span>
+                                </span>
+                            </label>
+                        </div>
                     </section>
 
                     <section className="overflow-hidden rounded-lg border border-white/15 bg-white/10 shadow-2xl shadow-black/20">
@@ -600,7 +641,9 @@ export default function PointsForm({
                                     {canEditPoints && filteredPlayers.length === 0 ? (
                                         <tr className="bg-white/5">
                                             <td colSpan={9} className="px-3 py-4 text-center text-sm text-emerald-100/85">
-                                                Aucun joueur ne correspond aux pays du match et aux filtres actifs.
+                                                {showOnlyParticipantPlayers
+                                                    ? "Aucun joueur sélectionné par les participants ne correspond aux pays du match et aux filtres actifs."
+                                                    : "Aucun joueur ne correspond aux pays du match et aux filtres actifs."}
                                             </td>
                                         </tr>
                                     ) : null}
@@ -608,12 +651,28 @@ export default function PointsForm({
                                         const row = rows.get(player.id) ?? defaultRowState();
                                         const position = player.normalizedPosition as Position;
                                         const playerPoints = computePoints(position, row);
+                                        const highlightClassName = player.isInParticipantTeam
+                                            ? "bg-yellow-300/10"
+                                            : "bg-white/5";
 
                                         return (
-                                            <tr key={player.id} className="bg-white/5">
+                                            <tr key={player.id} className={highlightClassName}>
                                                 <td className="px-3 py-2">{player.countryName}</td>
                                                 <td className="px-3 py-2">{position}</td>
-                                                <td className="px-3 py-2 font-semibold">{player.name}</td>
+                                                <td className="px-3 py-2 font-semibold">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <span>{player.name}</span>
+                                                        {player.isInParticipantTeam ? (
+                                                            <span className="inline-flex rounded-full border border-yellow-200/40 bg-yellow-300/20 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-yellow-100">
+                                                                {formatUsageLabel(player.usageCount)}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-100/60">
+                                                                Hors équipes
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </td>
                                                 <td className="px-3 py-2">
                                                     <input
                                                         type="number"

@@ -2,6 +2,10 @@ import { createClient } from "@/lib/supabaseServer";
 import { requireAdminRole } from "@/lib/authz";
 import PointsForm from "./points-form";
 
+type ActiveTeamPlayerRow = {
+    player_id: string;
+};
+
 type PageProps = {
     searchParams?: Promise<{
         matchId?: string;
@@ -14,7 +18,7 @@ export default async function AdminPointsPage({ searchParams }: PageProps) {
     const resolvedSearchParams = searchParams ? await searchParams : undefined;
     const supabase = await createClient();
 
-    const [playersResult, countriesResult, matchesResult] = await Promise.all([
+    const [playersResult, countriesResult, matchesResult, activeTeamPlayersResult] = await Promise.all([
         supabase
             .from("players")
             .select("id,name,country_code,position")
@@ -26,10 +30,14 @@ export default async function AdminPointsPage({ searchParams }: PageProps) {
             .from("matches")
             .select("id,team_home,team_away,match_date,stage,home_score,away_score")
             .order("match_date", { ascending: false }),
+        supabase.from("team_players").select("player_id").eq("is_active", true),
     ]);
 
     const loadError =
-        playersResult.error?.message ?? countriesResult.error?.message ?? matchesResult.error?.message;
+        playersResult.error?.message ??
+        countriesResult.error?.message ??
+        matchesResult.error?.message ??
+        activeTeamPlayersResult.error?.message;
 
     if (loadError) {
         return (
@@ -44,6 +52,12 @@ export default async function AdminPointsPage({ searchParams }: PageProps) {
     }
 
     const matches = matchesResult.data ?? [];
+    const playerUsageCounts = ((activeTeamPlayersResult.data ?? []) as ActiveTeamPlayerRow[]).reduce<
+        Record<string, number>
+    >((acc, row) => {
+        acc[row.player_id] = (acc[row.player_id] ?? 0) + 1;
+        return acc;
+    }, {});
     const selectedMatchId =
         resolvedSearchParams?.matchId && matches.some((match) => match.id === resolvedSearchParams.matchId)
             ? resolvedSearchParams.matchId
@@ -77,6 +91,7 @@ export default async function AdminPointsPage({ searchParams }: PageProps) {
             countries={countriesResult.data ?? []}
             matches={matches}
             existingPoints={pointsData ?? []}
+            playerUsageCounts={playerUsageCounts}
             selectedMatchId={selectedMatchId ?? ""}
         />
     );
