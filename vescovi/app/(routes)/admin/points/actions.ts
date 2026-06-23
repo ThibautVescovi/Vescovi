@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabaseServer";
 import { requireAdminRole } from "@/lib/authz";
+import { isPreChangeStage, normalizePosition } from "@/lib/teamChanges";
+import { createServiceRoleClient } from "@/lib/supabaseAdmin";
 
 type Appearance = "none" | "full" | "subbed_out" | "subbed_in";
 
@@ -44,6 +46,7 @@ const ALLOWED_STAGES = [
     "Match 1",
     "Match 2",
     "Match 3",
+    "Seizièmes",
     "Huitièmes",
     "Quarts",
     "Demis",
@@ -79,51 +82,6 @@ function hasCleanSheet(position: Position, appearance: Appearance, goalsConceded
     }
 
     return goalsConceded === 0;
-}
-
-function normalizeText(value: string) {
-    return value
-        .trim()
-        .toLocaleLowerCase("fr-FR")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
-}
-
-function normalizePosition(value: string): Position | null {
-    const position = normalizeText(value);
-
-    if (
-        ["g", "gb", "gk", "goalkeeper", "keeper", "gardien"].includes(position) ||
-        position.includes("gardien")
-    ) {
-        return "Gardien";
-    }
-
-    if (
-        ["d", "df", "def", "defenseur", "defender", "defence", "defense"].includes(position) ||
-        position.includes("defenseur") ||
-        position.includes("defender")
-    ) {
-        return "Défenseur";
-    }
-
-    if (
-        ["m", "mf", "mid", "milieu", "midfield", "midfielder"].includes(position) ||
-        position.includes("milieu") ||
-        position.includes("midfield")
-    ) {
-        return "Milieu";
-    }
-
-    if (
-        ["a", "fw", "fwd", "att", "attaquant", "attack", "attacker", "forward"].includes(position) ||
-        position.includes("attaquant") ||
-        position.includes("forward")
-    ) {
-        return "Attaquant";
-    }
-
-    return null;
 }
 
 function computePoints(row: PlayerPointInput) {
@@ -210,15 +168,28 @@ function isAllowedStage(value: string): value is Stage {
 
 async function recalculateTeamTotals(): Promise<SavePointsResult> {
     const supabase = await createClient();
+    const serviceRoleClient = createServiceRoleClient();
 
-    const [{ data: performances, error: performancesError }, { data: players, error: playersError }] =
+    const [
+        { data: performances, error: performancesError },
+        { data: players, error: playersError },
+        { data: matches, error: matchesError },
+        { data: activeTeamPlayers, error: activeTeamPlayersError },
+        { data: teamChanges, error: teamChangesError },
+    ] =
         await Promise.all([
             supabase
                 .from("player_performances")
                 .select(
-                    "player_id,goals,played_full_match,is_starter,is_substitute_in,yellow_cards,red_cards,goals_conceded",
+                    "player_id,match_id,goals,played_full_match,is_starter,is_substitute_in,yellow_cards,red_cards,goals_conceded",
                 ),
             supabase.from("players").select("id,position"),
+            supabase.from("matches").select("id,stage"),
+            supabase.from("team_players").select("team_id,player_id").eq("is_active", true),
+            (serviceRoleClient ?? supabase)
+                .from("team_changes")
+                .select("team_id,player_out_id,player_in_id,created_at")
+                .order("created_at", { ascending: true }),
         ]);
 
     if (performancesError) {
@@ -235,12 +206,38 @@ async function recalculateTeamTotals(): Promise<SavePointsResult> {
         };
     }
 
+    if (matchesError) {
+        return {
+            ok: false,
+            message: `Impossible de relire les matchs: ${matchesError.message}`,
+        };
+    }
+
+    if (activeTeamPlayersError) {
+        return {
+            ok: false,
+            message: `Impossible de recalculer les equipes: ${activeTeamPlayersError.message}`,
+        };
+    }
+
+    if (teamChangesError) {
+        return {
+            ok: false,
+            message: `Impossible de relire les changements equipes: ${teamChangesError.message}`,
+        };
+    }
+
     const positionsByPlayerId = new Map(
         (players ?? []).map((player) => [player.id, player.position as string]),
     );
 
-    const totalsByPlayer = ((performances ?? []) as PlayerPerformanceRow[]).reduce<Record<string, number>>(
-        (acc, performance) => {
+    const isPreChangeMatchById = new Map(
+        (matches ?? []).map((match) => [match.id, isPreChangeStage(match.stage)]),
+    );
+
+    const pointsByPlayerAndMatch = ((performances ?? []) as Array<PlayerPerformanceRow & { match_id: string }>).reduce<
+        Record<string, Record<string, number>>
+    >((acc, performance) => {
             const rawPosition = positionsByPlayerId.get(performance.player_id);
 
             if (!rawPosition) {
@@ -263,26 +260,67 @@ async function recalculateTeamTotals(): Promise<SavePointsResult> {
                 appearance: toAppearance(performance),
             });
 
-            acc[performance.player_id] = (acc[performance.player_id] ?? 0) + points;
+            if (!acc[performance.player_id]) {
+                acc[performance.player_id] = {};
+            }
+
+            acc[performance.player_id][performance.match_id] =
+                (acc[performance.player_id][performance.match_id] ?? 0) + points;
             return acc;
         },
         {},
     );
 
-    const { data: activeTeamPlayers, error: activeTeamPlayersError } = await supabase
-        .from("team_players")
-        .select("team_id,player_id")
-        .eq("is_active", true);
+    const activePlayerIdsByTeam = (activeTeamPlayers ?? []).reduce<Record<string, string[]>>((acc, teamPlayer) => {
+        acc[teamPlayer.team_id] = [...(acc[teamPlayer.team_id] ?? []), teamPlayer.player_id];
+        return acc;
+    }, {});
 
-    if (activeTeamPlayersError) {
-        return {
-            ok: false,
-            message: `Impossible de recalculer les equipes: ${activeTeamPlayersError.message}`,
-        };
-    }
+    const changesByTeam = (teamChanges ?? []).reduce<
+        Record<string, Array<{ player_out_id: string | null; player_in_id: string | null }>>
+    >((acc, change) => {
+        acc[change.team_id] = [
+            ...(acc[change.team_id] ?? []),
+            {
+                player_out_id: change.player_out_id,
+                player_in_id: change.player_in_id,
+            },
+        ];
+        return acc;
+    }, {});
 
-    const totalsByTeam = (activeTeamPlayers ?? []).reduce<Record<string, number>>((acc, teamPlayer) => {
-        acc[teamPlayer.team_id] = (acc[teamPlayer.team_id] ?? 0) + (totalsByPlayer[teamPlayer.player_id] ?? 0);
+    const totalsByTeam = Object.entries(activePlayerIdsByTeam).reduce<Record<string, number>>((acc, [teamId, basePlayerIds]) => {
+        const outgoingIds = new Set(
+            (changesByTeam[teamId] ?? [])
+                .map((change) => change.player_out_id)
+                .filter((value): value is string => Boolean(value)),
+        );
+        const incomingIds = new Set(
+            (changesByTeam[teamId] ?? [])
+                .map((change) => change.player_in_id)
+                .filter((value): value is string => Boolean(value)),
+        );
+        const scoringPlayerIds = Array.from(new Set([...basePlayerIds, ...incomingIds]));
+
+        acc[teamId] = scoringPlayerIds.reduce((teamTotal, playerId) => {
+            const byMatch = pointsByPlayerAndMatch[playerId] ?? {};
+            const playerTotal = Object.entries(byMatch).reduce((sum, [matchId, points]) => {
+                const isPreChangeMatch = isPreChangeMatchById.get(matchId) ?? false;
+
+                if (incomingIds.has(playerId) && isPreChangeMatch) {
+                    return sum;
+                }
+
+                if (outgoingIds.has(playerId) && !isPreChangeMatch) {
+                    return sum;
+                }
+
+                return sum + points;
+            }, 0);
+
+            return teamTotal + playerTotal;
+        }, 0);
+
         return acc;
     }, {});
 

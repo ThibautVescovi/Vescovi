@@ -1,76 +1,46 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabaseServer";
 import { requireAdminRole } from "@/lib/authz";
-
-type Position = "Gardien" | "Défenseur" | "Milieu" | "Attaquant";
+import { applyTeamChanges, normalizePosition, validateTeamComposition } from "@/lib/teamChanges";
 
 export type MakeTeamChangeResult = {
     ok: boolean;
     message: string;
 };
 
-export type TeamChangePayload = {
-    teamId: string;
-    playerOutId: string | null;
-    playerInId: string | null;
+export type TeamChangeSelection = {
+    playerOutId: string;
+    playerInId: string;
 };
 
-function normalizeText(value: string) {
-    return value
-        .trim()
-        .toLocaleLowerCase("fr-FR")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
-}
+export type TeamChangePayload = {
+    teamId: string;
+    changes: TeamChangeSelection[];
+};
 
-function normalizePosition(value: string): Position | null {
-    const position = normalizeText(value);
+function getAdminClient() {
+    const serviceRoleKey =
+        process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (
-        ["g", "gb", "gk", "goalkeeper", "keeper", "gardien"].includes(position) ||
-        position.includes("gardien")
-    ) {
-        return "Gardien";
-    }
-
-    if (
-        ["d", "df", "def", "defenseur", "defender", "defence", "defense"].includes(position) ||
-        position.includes("defenseur") ||
-        position.includes("defender")
-    ) {
-        return "Défenseur";
-    }
-
-    if (
-        ["m", "mf", "mid", "milieu", "midfield", "midfielder"].includes(position) ||
-        position.includes("milieu") ||
-        position.includes("midfield")
-    ) {
-        return "Milieu";
-    }
-
-    if (
-        ["a", "fw", "fwd", "att", "attaquant", "attack", "attacker", "forward"].includes(
-            position,
-        ) ||
-        position.includes("attaquant") ||
-        position.includes("forward")
-    ) {
-        return "Attaquant";
+    if (serviceRoleKey && process.env.NEXT_PUBLIC_SUPABASE_URL) {
+        return createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL, serviceRoleKey, {
+            auth: { persistSession: false, autoRefreshToken: false },
+        });
     }
 
     return null;
 }
 
 export async function makeTeamChange(payload: TeamChangePayload): Promise<MakeTeamChangeResult> {
-    await requireAdminRole();
+    const { user } = await requireAdminRole();
 
     const supabase = await createClient();
-    const { teamId, playerOutId, playerInId } = payload;
+    const adminClient = getAdminClient() ?? supabase;
+    const { teamId, changes } = payload;
 
-    // Validation basique
     if (!teamId) {
         return {
             ok: false,
@@ -78,15 +48,48 @@ export async function makeTeamChange(payload: TeamChangePayload): Promise<MakeTe
         };
     }
 
-    // Au moins un joueur doit être changé
-    if (!playerOutId && !playerInId) {
+    if (!Array.isArray(changes)) {
         return {
             ok: false,
-            message: "Tu dois sélectionner au moins un changement.",
+            message: "Format de changements invalide.",
         };
     }
 
-    // Récupérer l'équipe et ses joueurs actuels
+    if (changes.length > 2) {
+        return {
+            ok: false,
+            message: "Deux changements maximum sont autorisés.",
+        };
+    }
+
+    const normalizedChanges = changes.filter(
+        (change) => change.playerOutId?.trim() && change.playerInId?.trim(),
+    );
+
+    if (normalizedChanges.length !== changes.length) {
+        return {
+            ok: false,
+            message: "Chaque changement doit contenir un joueur sortant et un joueur entrant.",
+        };
+    }
+
+    const outgoingIds = normalizedChanges.map((change) => change.playerOutId);
+    const incomingIds = normalizedChanges.map((change) => change.playerInId);
+
+    if (new Set(outgoingIds).size !== outgoingIds.length) {
+        return {
+            ok: false,
+            message: "Un même joueur sortant ne peut être choisi qu'une seule fois.",
+        };
+    }
+
+    if (new Set(incomingIds).size !== incomingIds.length) {
+        return {
+            ok: false,
+            message: "Un même joueur entrant ne peut être choisi qu'une seule fois.",
+        };
+    }
+
     const { data: team, error: teamError } = await supabase
         .from("teams")
         .select("id, user_id")
@@ -100,7 +103,36 @@ export async function makeTeamChange(payload: TeamChangePayload): Promise<MakeTe
         };
     }
 
-    // Récupérer les joueurs actuels de l'équipe
+    if (team.user_id !== user.id) {
+        return {
+            ok: false,
+            message: "Tu ne peux modifier que ta propre équipe.",
+        };
+    }
+
+    if (normalizedChanges.length === 0) {
+        const { error: deleteError } = await adminClient
+            .from("team_changes")
+            .delete()
+            .eq("team_id", teamId);
+
+        if (deleteError) {
+            return {
+                ok: false,
+                message: `Impossible de supprimer les changements existants: ${deleteError.message}`,
+            };
+        }
+
+        revalidatePath("/admin/changes");
+        revalidatePath("/view-team");
+        revalidatePath("/ranking");
+
+        return {
+            ok: true,
+            message: "Aucun changement enregistre. La composition de base est conservee.",
+        };
+    }
+
     const { data: teamPlayers, error: teamPlayersError } = await supabase
         .from("team_players")
         .select("player_id, position")
@@ -114,11 +146,16 @@ export async function makeTeamChange(payload: TeamChangePayload): Promise<MakeTe
         };
     }
 
-    // Récupérer les informations des joueurs
-    const playerIds = teamPlayers.map((tp) => tp.player_id);
+    const playerIds = Array.from(
+        new Set([
+            ...teamPlayers.map((teamPlayer) => teamPlayer.player_id),
+            ...incomingIds,
+        ]),
+    );
+
     const { data: currentPlayers, error: currentPlayersError } = await supabase
         .from("players")
-        .select("id, country_code, position")
+        .select("id, name, country_code, position")
         .in("id", playerIds);
 
     if (currentPlayersError || !currentPlayers) {
@@ -128,126 +165,95 @@ export async function makeTeamChange(payload: TeamChangePayload): Promise<MakeTe
         };
     }
 
-    // Vérifier les changements proposés
-    let playerOut: any = null;
-    let playerIn: any = null;
+    const playersById = new Map(currentPlayers.map((player) => [player.id, player]));
+    const currentTeamPlayers = teamPlayers
+        .map((teamPlayer) => playersById.get(teamPlayer.player_id))
+        .filter((player): player is NonNullable<typeof player> => Boolean(player));
 
-    if (playerOutId) {
-        playerOut = currentPlayers.find((p) => p.id === playerOutId);
+    if (currentTeamPlayers.length !== teamPlayers.length) {
+        return {
+            ok: false,
+            message: "Certains joueurs de l'équipe sont introuvables.",
+        };
+    }
+
+    for (const change of normalizedChanges) {
+        const playerOut = currentTeamPlayers.find((player) => player.id === change.playerOutId);
+        const playerIn = playersById.get(change.playerInId);
+
         if (!playerOut) {
             return {
                 ok: false,
                 message: "Le joueur à remplacer n'est pas dans l'équipe.",
             };
         }
-    }
 
-    if (playerInId) {
-        const { data: playerInData, error: playerInError } = await supabase
-            .from("players")
-            .select("id, country_code, position")
-            .eq("id", playerInId)
-            .single();
-
-        if (playerInError || !playerInData) {
+        if (!playerIn) {
             return {
                 ok: false,
                 message: "Le joueur entrant n'existe pas.",
             };
         }
 
-        playerIn = playerInData;
-
-        // Vérifier que le joueur entrant n'est pas déjà dans l'équipe
-        if (currentPlayers.some((p) => p.id === playerInId)) {
+        if (currentTeamPlayers.some((player) => player.id === change.playerInId)) {
             return {
                 ok: false,
                 message: "Ce joueur est déjà dans l'équipe.",
             };
         }
 
-        // Si on replace un joueur, vérifier les positions
-        if (playerOut) {
-            const outPosition = normalizePosition(playerOut.position);
-            const inPosition = normalizePosition(playerIn.position);
+        const outPosition = normalizePosition(playerOut.position);
+        const inPosition = normalizePosition(playerIn.position);
 
-            if (outPosition !== inPosition) {
-                return {
-                    ok: false,
-                    message: "Le joueur entrant doit avoir le même poste que le joueur sortant.",
-                };
-            }
+        if (outPosition !== inPosition) {
+            return {
+                ok: false,
+                message: "Le joueur entrant doit avoir le même poste que le joueur sortant.",
+            };
         }
     }
 
-    // Valider les règles de naturalité
-    const newTeamComposition = currentPlayers.filter((p) => p.id !== playerOutId);
-    if (playerIn) {
-        newTeamComposition.push(playerIn);
-    }
+    const nextTeamState = applyTeamChanges(
+        currentTeamPlayers,
+        normalizedChanges.map((change) => ({
+            player_out_id: change.playerOutId,
+            player_in_id: change.playerInId,
+        })),
+        playersById,
+    );
 
-    // Compter les nationalités
-    const nationalityCounts: Record<string, number> = {};
-    for (const player of newTeamComposition) {
-        if (player.country_code) {
-            nationalityCounts[player.country_code] =
-                (nationalityCounts[player.country_code] ?? 0) + 1;
-        }
-    }
-
-    const uniqueNationalities = Object.keys(nationalityCounts).length;
-    const overLimitCountries = Object.entries(nationalityCounts)
-        .filter(([, count]) => count > 3)
-        .map(([code]) => code);
-
-    if (uniqueNationalities < 5) {
+    if (nextTeamState.effectivePlayers.length !== currentTeamPlayers.length) {
         return {
             ok: false,
-            message: "L'équipe doit avoir au minimum 5 nationalités différentes.",
+            message: "Impossible de construire l'équipe après changements.",
         };
     }
 
-    if (overLimitCountries.length > 0) {
+    const validation = validateTeamComposition(nextTeamState.effectivePlayers);
+    if (!validation.ok) {
+        return validation;
+    }
+
+    const { error: deleteError } = await adminClient
+        .from("team_changes")
+        .delete()
+        .eq("team_id", teamId);
+
+    if (deleteError) {
         return {
             ok: false,
-            message: `L'équipe ne peut pas avoir plus de 3 joueurs d'une même nationalité: ${overLimitCountries.join(", ")}`,
+            message: `Impossible de remplacer les changements existants: ${deleteError.message}`,
         };
     }
 
-    // Valider la composition par poste
-    const positionCounts: Record<Position, number> = {
-        Gardien: 0,
-        Défenseur: 0,
-        Milieu: 0,
-        Attaquant: 0,
-    };
-
-    for (const player of newTeamComposition) {
-        const position = normalizePosition(player.position);
-        if (position) {
-            positionCounts[position] += 1;
-        }
-    }
-
-    if (
-        positionCounts.Gardien !== 1 ||
-        positionCounts.Défenseur !== 4 ||
-        positionCounts.Milieu !== 3 ||
-        positionCounts.Attaquant !== 3
-    ) {
-        return {
-            ok: false,
-            message: "La composition doit rester 1 gardien, 4 défenseurs, 3 milieux et 3 attaquants.",
-        };
-    }
-
-    // Enregistrer le changement dans team_changes
-    const { error: changeError } = await supabase.from("team_changes").insert({
-        team_id: teamId,
-        player_out_id: playerOutId || null,
-        player_in_id: playerInId || null,
-        created_at: new Date().toISOString(),
-    });
+    const { error: changeError } = await adminClient.from("team_changes").insert(
+        normalizedChanges.map((change) => ({
+            team_id: teamId,
+            player_out_id: change.playerOutId,
+            player_in_id: change.playerInId,
+            created_at: new Date().toISOString(),
+        })),
+    );
 
     if (changeError) {
         return {
@@ -257,11 +263,14 @@ export async function makeTeamChange(payload: TeamChangePayload): Promise<MakeTe
     }
 
     revalidatePath("/admin/changes");
+    revalidatePath("/view-team");
+    revalidatePath("/ranking");
 
     return {
         ok: true,
-        message: "Changement enregistré avec succès.",
+        message:
+            normalizedChanges.length > 1
+                ? "Tes deux changements ont bien été enregistrés. Ils remplacent la demande précédente."
+                : "Ton changement a bien été enregistré. Il remplace la demande précédente.",
     };
 }
-
-

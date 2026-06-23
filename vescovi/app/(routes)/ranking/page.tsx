@@ -50,11 +50,15 @@ export default async function RankingPage() {
         `)
         .order("total_points", {ascending: false});
 
-    const rankings: RankingEntry[] = (scores ?? []).map((row, index) => {
+    const rankings: RankingEntry[] = (scores ?? []).map((row, index, allRows) => {
+        const currentTotalPoints = row.total_points ?? 0;
+        // Classement de type "compétition": 1, 1, 3 (pas de 2 en cas d'ex aequo à la 1re place).
+        const rank = allRows.findIndex((entry) => (entry.total_points ?? 0) === currentTotalPoints) + 1;
+
         const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
         const entry = Array.isArray(row.entries) ? row.entries[0] : row.entries;
         return {
-            rank: index + 1,
+            rank,
             teamId: row.team_id,
             userId: row.user_id,
             teamName: row.team_name,
@@ -67,10 +71,9 @@ export default async function RankingPage() {
         };
     });
 
-    const currentUserRank = rankings.find((r) => {
-        const row = (scores ?? []).find((s) => s.team_id === r.teamId);
-        return row?.user_id === user?.id;
-    });
+    const currentUserRank = rankings.find((entry) => entry.userId === user?.id);
+
+    const podiumEntries = rankings.filter((entry) => entry.rank <= 3);
 
     const medals = ["🥇", "🥈", "🥉"];
 
@@ -97,9 +100,9 @@ export default async function RankingPage() {
                 </div>
 
                 {/* Podium top 3 */}
-                {rankings.length >= 1 && (
+                {podiumEntries.length >= 1 && (
                     <div className="mb-10 grid gap-4 sm:grid-cols-3">
-                        {rankings.slice(0, 3).map((entry) => {
+                        {podiumEntries.map((entry) => {
                             const isMe = entry.teamId === currentUserRank?.teamId;
                             const medal = medals[entry.rank - 1];
                             const podiumColors = [

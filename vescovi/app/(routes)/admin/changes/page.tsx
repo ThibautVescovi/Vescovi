@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabaseServer";
 import { requireAdminRole } from "@/lib/authz";
+import { createServiceRoleClient } from "@/lib/supabaseAdmin";
 import ChangesForm from "./changes-form";
 
 type TeamWithPlayers = {
@@ -14,13 +15,30 @@ type TeamWithPlayers = {
     }>;
 };
 
+type Country = {
+    code: string;
+    name: string;
+};
+
+type InitialTeamChange = {
+    playerOutId: string;
+    playerInId: string;
+};
+
+type RawTeamChange = {
+    player_out_id: string | null;
+    player_in_id: string | null;
+    created_at: string | null;
+};
+
 export default async function AdminChangesPage() {
     const { user } = await requireAdminRole();
 
     const supabase = await createClient();
+    const serviceRoleClient = createServiceRoleClient();
 
     // Charger l'équipe de l'utilisateur connecté
-    const { data: userTeam, error: userTeamError } = await supabase
+    const { data: userTeam } = await supabase
         .from("teams")
         .select("id, name, user_id")
         .eq("user_id", user.id)
@@ -46,23 +64,31 @@ export default async function AdminChangesPage() {
         );
     }
 
-    const [playersResult, teamPlayersResult] = await Promise.all([
+    const [playersResult, countriesResult, teamPlayersResult, teamChangesResult] = await Promise.all([
         supabase
             .from("players")
             .select("id, name, country_code, position")
             .order("country_code", { ascending: true })
             .order("position", { ascending: true })
             .order("name", { ascending: true }),
+        supabase.from("countries").select("code, name").order("name", { ascending: true }),
         supabase
             .from("team_players")
             .select("player_id")
             .eq("team_id", userTeam.id)
             .eq("is_active", true),
+        (serviceRoleClient ?? supabase)
+            .from("team_changes")
+            .select("player_out_id, player_in_id, created_at")
+            .eq("team_id", userTeam.id)
+            .order("created_at", { ascending: true }),
     ]);
 
     const loadError =
         playersResult.error?.message ??
-        teamPlayersResult.error?.message;
+        countriesResult.error?.message ??
+        teamPlayersResult.error?.message ??
+        teamChangesResult.error?.message;
 
     if (loadError) {
         return (
@@ -103,10 +129,23 @@ export default async function AdminChangesPage() {
         players: teamPlayerDetails,
     };
 
+    const rawTeamChanges = (teamChangesResult.data ?? []) as RawTeamChange[];
+
+    const initialChanges: InitialTeamChange[] = rawTeamChanges
+        .filter((change) => change.player_out_id && change.player_in_id)
+        .slice(0, 2)
+        .map((change) => ({
+            playerOutId: change.player_out_id ?? "",
+            playerInId: change.player_in_id ?? "",
+        }));
+
     return (
         <ChangesForm
             userTeam={userTeamWithPlayers}
             players={playersResult.data ?? []}
+            countries={(countriesResult.data ?? []) as Country[]}
+            initialChanges={initialChanges}
+            hasAnySavedRequest={rawTeamChanges.length > 0}
             loadError={loadError ?? null}
         />
     );

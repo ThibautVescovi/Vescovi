@@ -73,63 +73,6 @@ function buildSelections(initialSelections: InitialSelection[]) {
     return nextSelections;
 }
 
-const rules = [
-    "11 joueurs",
-    "1 gardien",
-    "4 défenseurs",
-    "3 milieux",
-    "3 attaquants",
-    "Au minimum 5 nationalités",
-    "Au maximum 3 joueurs par nationalité",
-];
-
-function normalizeText(value: string) {
-    return value
-        .trim()
-        .toLocaleLowerCase("fr-FR")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
-}
-
-function normalizePosition(value: string): Position | null {
-    const position = normalizeText(value);
-
-    if (
-        ["g", "gb", "gk", "goalkeeper", "keeper", "gardien"].includes(position) ||
-        position.includes("gardien")
-    ) {
-        return "Gardien";
-    }
-
-    if (
-        ["d", "df", "def", "defenseur", "defender", "defence", "defense"].includes(position) ||
-        position.includes("defenseur") ||
-        position.includes("defender")
-    ) {
-        return "Défenseur";
-    }
-
-    if (
-        ["m", "mf", "mid", "milieu", "midfield", "midfielder"].includes(position) ||
-        position.includes("milieu") ||
-        position.includes("midfield")
-    ) {
-        return "Milieu";
-    }
-
-    if (
-        ["a", "fw", "fwd", "att", "attaquant", "attack", "attacker", "forward"].includes(
-            position,
-        ) ||
-        position.includes("attaquant") ||
-        position.includes("forward")
-    ) {
-        return "Attaquant";
-    }
-
-    return null;
-}
-
 export default function TeamForm({
     players,
     countries,
@@ -138,10 +81,10 @@ export default function TeamForm({
     initialTeamName,
     loadError,
 }: TeamFormProps) {
-    const [selections, setSelections] = useState<Record<string, SlotSelection>>(() => {
+    const [selections] = useState<Record<string, SlotSelection>>(() => {
         return buildSelections(initialSelections);
     });
-    const [saveResult, setSaveResult] = useState<SaveTeamResult | null>(null);
+    const [, setSaveResult] = useState<SaveTeamResult | null>(null);
     const [wineName, setWineName] = useState(initialWineName);
     const [teamName, setTeamName] = useState(initialTeamName);
     const [isSaving, startSaving] = useTransition();
@@ -159,17 +102,6 @@ export default function TeamForm({
         () => new Set(Object.values(selections).map((selection) => selection.playerId).filter(Boolean)),
         [selections],
     );
-
-    const countriesWithPlayers = useMemo(() => {
-        const countryCodes = new Set(players.map((player) => player.country_code).filter(Boolean));
-
-        return Array.from(countryCodes)
-            .map((code) => ({
-                code,
-                name: countryNamesByCode.get(code) ?? code,
-            }))
-            .sort((a, b) => a.name.localeCompare(b.name, "fr-FR"));
-    }, [countryNamesByCode, players]);
 
     const stats = useMemo(() => {
         const selected = Object.values(selections)
@@ -206,30 +138,6 @@ export default function TeamForm({
         stats.hasEnoughNationalities &&
         stats.respectsNationalityLimit &&
         stats.hasUniquePlayers;
-
-    function updateCountry(slotId: string, countryCode: string) {
-        setSaveResult(null);
-        setSelections((current) => ({
-            ...current,
-            [slotId]: {
-                countryCode,
-                playerId: "",
-            },
-        }));
-    }
-
-    function updatePlayer(slotId: string, playerId: string) {
-        const player = playersById.get(playerId);
-
-        setSaveResult(null);
-        setSelections((current) => ({
-            ...current,
-            [slotId]: {
-                countryCode: player?.country_code ?? current[slotId].countryCode,
-                playerId,
-            },
-        }));
-    }
 
     function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -487,18 +395,3 @@ export default function TeamForm({
     );
 }
 
-function RuleStatus({ valid, label }: { valid: boolean; label: string }) {
-    return (
-        <div className="flex items-center gap-3 rounded-md border border-white/10 bg-emerald-950/45 px-3 py-3">
-            <span
-                className={[
-                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-black",
-                    valid ? "bg-emerald-300 text-green-950" : "bg-white/15 text-emerald-50/70",
-                ].join(" ")}
-            >
-                {valid ? "✓" : "!"}
-            </span>
-            <span className="text-sm font-bold text-emerald-50/90">{label}</span>
-        </div>
-    );
-}

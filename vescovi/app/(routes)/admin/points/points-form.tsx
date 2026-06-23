@@ -57,6 +57,7 @@ const STAGE_OPTIONS = [
     "Match 1",
     "Match 2",
     "Match 3",
+    "Seizièmes",
     "Huitièmes",
     "Quarts",
     "Demis",

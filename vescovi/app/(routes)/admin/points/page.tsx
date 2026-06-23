@@ -1,8 +1,11 @@
 import { createClient } from "@/lib/supabaseServer";
 import { requireAdminRole } from "@/lib/authz";
+import { isPreChangeStage } from "@/lib/teamChanges";
+import { createServiceRoleClient } from "@/lib/supabaseAdmin";
 import PointsForm from "./points-form";
 
 type ActiveTeamPlayerRow = {
+    team_id: string;
     player_id: string;
 };
 
@@ -17,8 +20,9 @@ export default async function AdminPointsPage({ searchParams }: PageProps) {
 
     const resolvedSearchParams = searchParams ? await searchParams : undefined;
     const supabase = await createClient();
+    const serviceRoleClient = createServiceRoleClient();
 
-    const [playersResult, countriesResult, matchesResult, activeTeamPlayersResult] = await Promise.all([
+    const [playersResult, countriesResult, matchesResult, activeTeamPlayersResult, teamChangesResult] = await Promise.all([
         supabase
             .from("players")
             .select("id,name,country_code,position")
@@ -30,14 +34,19 @@ export default async function AdminPointsPage({ searchParams }: PageProps) {
             .from("matches")
             .select("id,team_home,team_away,match_date,stage,home_score,away_score")
             .order("match_date", { ascending: false }),
-        supabase.from("team_players").select("player_id").eq("is_active", true),
+        supabase.from("team_players").select("team_id,player_id").eq("is_active", true),
+        (serviceRoleClient ?? supabase)
+            .from("team_changes")
+            .select("team_id,player_out_id,player_in_id,created_at")
+            .order("created_at", { ascending: true }),
     ]);
 
     const loadError =
         playersResult.error?.message ??
         countriesResult.error?.message ??
         matchesResult.error?.message ??
-        activeTeamPlayersResult.error?.message;
+        activeTeamPlayersResult.error?.message ??
+        teamChangesResult.error?.message;
 
     if (loadError) {
         return (
@@ -52,16 +61,58 @@ export default async function AdminPointsPage({ searchParams }: PageProps) {
     }
 
     const matches = matchesResult.data ?? [];
-    const playerUsageCounts = ((activeTeamPlayersResult.data ?? []) as ActiveTeamPlayerRow[]).reduce<
-        Record<string, number>
-    >((acc, row) => {
-        acc[row.player_id] = (acc[row.player_id] ?? 0) + 1;
-        return acc;
-    }, {});
     const selectedMatchId =
         resolvedSearchParams?.matchId && matches.some((match) => match.id === resolvedSearchParams.matchId)
             ? resolvedSearchParams.matchId
             : matches[0]?.id;
+    const selectedMatch = matches.find((match) => match.id === selectedMatchId);
+    const selectedMatchIsPreChange = selectedMatch ? isPreChangeStage(selectedMatch.stage) : true;
+
+    const basePlayersByTeam = ((activeTeamPlayersResult.data ?? []) as ActiveTeamPlayerRow[]).reduce<
+        Record<string, string[]>
+    >((acc, row) => {
+        acc[row.team_id] = [...(acc[row.team_id] ?? []), row.player_id];
+        return acc;
+    }, {});
+
+    const changesByTeam = (teamChangesResult.data ?? []).reduce<
+        Record<string, Array<{ player_out_id: string | null; player_in_id: string | null }>>
+    >((acc, change) => {
+        acc[change.team_id] = [
+            ...(acc[change.team_id] ?? []),
+            {
+                player_out_id: change.player_out_id,
+                player_in_id: change.player_in_id,
+            },
+        ];
+        return acc;
+    }, {});
+
+    const playerUsageCounts = Object.entries(basePlayersByTeam).reduce<Record<string, number>>(
+        (acc, [teamId, basePlayerIds]) => {
+            const effectivePlayerIds = selectedMatchIsPreChange
+                ? basePlayerIds
+                : (() => {
+                      const nextPlayers = new Set(basePlayerIds);
+                      for (const change of changesByTeam[teamId] ?? []) {
+                          if (change.player_out_id) {
+                              nextPlayers.delete(change.player_out_id);
+                          }
+                          if (change.player_in_id) {
+                              nextPlayers.add(change.player_in_id);
+                          }
+                      }
+                      return Array.from(nextPlayers);
+                  })();
+
+            for (const playerId of effectivePlayerIds) {
+                acc[playerId] = (acc[playerId] ?? 0) + 1;
+            }
+
+            return acc;
+        },
+        {},
+    );
 
     const { data: pointsData, error: pointsError } = selectedMatchId
         ? await supabase
