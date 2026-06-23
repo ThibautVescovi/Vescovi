@@ -1,9 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabaseServer";
-import { requireAdminRole } from "@/lib/authz";
+import { getCurrentUserWithRole } from "@/lib/authz";
 import { applyTeamChanges, normalizePosition, validateTeamComposition } from "@/lib/teamChanges";
 
 export type MakeTeamChangeResult = {
@@ -35,7 +36,11 @@ function getAdminClient() {
 }
 
 export async function makeTeamChange(payload: TeamChangePayload): Promise<MakeTeamChangeResult> {
-    const { user } = await requireAdminRole();
+    const { user } = await getCurrentUserWithRole();
+
+    if (!user) {
+        redirect("/login");
+    }
 
     const supabase = await createClient();
     const adminClient = getAdminClient() ?? supabase;

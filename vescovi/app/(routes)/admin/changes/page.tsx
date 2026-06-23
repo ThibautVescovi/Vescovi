@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabaseServer";
-import { requireAdminRole } from "@/lib/authz";
+import { getCurrentUserWithRole } from "@/lib/authz";
 import { createServiceRoleClient } from "@/lib/supabaseAdmin";
+import { redirect } from "next/navigation";
 import ChangesForm from "./changes-form";
 
 type TeamWithPlayers = {
@@ -32,7 +33,11 @@ type RawTeamChange = {
 };
 
 export default async function AdminChangesPage() {
-    const { user } = await requireAdminRole();
+    const { user } = await getCurrentUserWithRole();
+
+    if (!user) {
+        redirect("/login");
+    }
 
     const supabase = await createClient();
     const serviceRoleClient = createServiceRoleClient();
