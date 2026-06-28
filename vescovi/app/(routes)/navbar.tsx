@@ -7,7 +7,7 @@ import {supabaseClient} from "@/lib/supabaseClient";
 const baseNavItems = [
     {label: "Classement", href: "/ranking", icon: "#1"},
     {label: "KiKiLa?", href: "/kikila", icon: "K?"},
-    {label: "Changements", href: "/admin/changes", icon: "CHG"},
+    // {label: "Changements", href: "/admin/changes", icon: "CHG"},
     {label: "Mon équipe", href: "/view-team", icon: "ME"},
     {label: "Modifier mon équipe", href: "/team", icon: "XI"},
     {label: "Règles", href: "/rules", icon: "RG"},

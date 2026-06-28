@@ -412,17 +412,17 @@ export default function ChangesForm({
                             )}
 
                             <div className="flex flex-col gap-3 sm:flex-row">
-                                <button
-                                    type="submit"
-                                    disabled={!canSubmit || isSaving}
-                                    className="flex-1 rounded-md bg-yellow-300 px-5 py-3 text-sm font-black text-green-950 shadow-lg shadow-yellow-950/20 transition hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-yellow-100 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
-                                >
-                                    {isSaving
-                                        ? "Enregistrement..."
-                                        : completeChanges.length === 2
-                                          ? "Enregistrer mes 2 changements"
-                                          : "Enregistrer mon changement"}
-                                </button>
+                                {/*<button*/}
+                                {/*    type="submit"*/}
+                                {/*    disabled={!canSubmit || isSaving}*/}
+                                {/*    className="flex-1 rounded-md bg-yellow-300 px-5 py-3 text-sm font-black text-green-950 shadow-lg shadow-yellow-950/20 transition hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-yellow-100 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"*/}
+                                {/*>*/}
+                                {/*    {isSaving*/}
+                                {/*        ? "Enregistrement..."*/}
+                                {/*        : completeChanges.length === 2*/}
+                                {/*          ? "Enregistrer mes 2 changements"*/}
+                                {/*          : "Enregistrer mon changement"}*/}
+                                {/*</button>*/}
                                 <button
                                     type="button"
                                     onClick={handleClearChanges}
