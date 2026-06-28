@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabaseServer";
+import { createServiceRoleClient } from "@/lib/supabaseAdmin";
 import KiKiLaFilters from "./kikila-filters";
 
 type Country = {
@@ -47,6 +48,8 @@ export default async function KiKiLaPage({
     searchParams: Promise<{ country?: string; playerId?: string }>;
 }) {
     const supabase = await createClient();
+    // Le client service role bypass le RLS pour lire toutes les team_changes (pas seulement les siennes)
+    const adminClient = createServiceRoleClient() ?? supabase;
     const { country, playerId } = await searchParams;
 
     const selectedCountryCode = typeof country === "string" ? country.trim().toUpperCase() : "";
@@ -70,6 +73,7 @@ export default async function KiKiLaPage({
     const players = (playersData ?? []) as Player[];
     const selectedPlayer = players.find((player) => player.id === selectedPlayerId) ?? null;
 
+    // Équipes où le joueur est dans le squad initial (is_active = true)
     const { data: teamPlayersData, error: teamPlayersError } = selectedPlayer
         ? await supabase
               .from("team_players")
@@ -78,9 +82,36 @@ export default async function KiKiLaPage({
               .eq("is_active", true)
         : { data: [], error: null };
 
-    const uniqueTeamIds = Array.from(
-        new Set((teamPlayersData ?? []).map((row) => row.team_id).filter((teamId): teamId is string => Boolean(teamId))),
+    // Équipes où le joueur est entré via un changement (player_in_id) — service role pour bypasser le RLS
+    const { data: changesInData, error: changesInError } = selectedPlayer
+        ? await adminClient
+              .from("team_changes")
+              .select("team_id")
+              .eq("player_in_id", selectedPlayer.id)
+        : { data: [], error: null };
+
+    // Équipes où le joueur a été sorti via un changement (player_out_id) — à exclure du squad initial
+    const { data: changesOutData, error: changesOutError } = selectedPlayer
+        ? await adminClient
+              .from("team_changes")
+              .select("team_id")
+              .eq("player_out_id", selectedPlayer.id)
+        : { data: [], error: null };
+
+    const initialTeamIds = new Set(
+        (teamPlayersData ?? []).map((row) => row.team_id).filter((id): id is string => Boolean(id)),
     );
+    const changesInTeamIds = new Set(
+        (changesInData ?? []).map((row) => row.team_id).filter((id): id is string => Boolean(id)),
+    );
+    const changesOutTeamIds = new Set(
+        (changesOutData ?? []).map((row) => row.team_id).filter((id): id is string => Boolean(id)),
+    );
+
+    // Actif dans l'équipe initiale ET non sorti par un changement
+    const activeInitialIds = new Set([...initialTeamIds].filter((id) => !changesOutTeamIds.has(id)));
+    // Tous les team IDs actifs (initiaux non sortis + entrants via changement)
+    const uniqueTeamIds = Array.from(new Set([...activeInitialIds, ...changesInTeamIds]));
 
     const { data: teamsData, error: teamsError } = uniqueTeamIds.length
         ? await supabase
@@ -104,6 +135,8 @@ export default async function KiKiLaPage({
             team,
             profile: profilesById.get(team.user_id),
             participantName: formatParticipantName(profilesById.get(team.user_id)),
+            // true si le joueur est arrivé via un changement (pas dans le squad initial)
+            isViaChange: changesInTeamIds.has(team.id) && !activeInitialIds.has(team.id),
         }))
         .sort((a, b) => a.participantName.localeCompare(b.participantName, "fr"));
 
@@ -111,6 +144,8 @@ export default async function KiKiLaPage({
         countriesError?.message ??
         playersError?.message ??
         teamPlayersError?.message ??
+        changesInError?.message ??
+        changesOutError?.message ??
         teamsError?.message ??
         profilesError?.message ??
         null;
@@ -155,8 +190,26 @@ export default async function KiKiLaPage({
                         ) : (
                             <ul className="mt-4 grid gap-3 sm:grid-cols-2">
                                 {participantRows.map((row) => (
-                                    <li key={row.team.id} className="rounded-xl border border-white/10 bg-emerald-950/35 p-4">
-                                        <p className="truncate text-base font-black text-white">{row.participantName}</p>
+                                    <li
+                                        key={row.team.id}
+                                        className={`rounded-xl border p-4 ${
+                                            row.isViaChange
+                                                ? "border-emerald-300/30 bg-emerald-950/50"
+                                                : "border-white/10 bg-emerald-950/35"
+                                        }`}
+                                    >
+                                        <div className="flex items-start justify-between gap-2">
+                                            <p className="truncate text-base font-black text-white">{row.participantName}</p>
+                                            {row.isViaChange ? (
+                                                <span className="shrink-0 rounded-full border border-emerald-300/40 bg-emerald-400/20 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-100">
+                                                    Entrant
+                                                </span>
+                                            ) : (
+                                                <span className="shrink-0 rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-white/70">
+                                                    Initial
+                                                </span>
+                                            )}
+                                        </div>
                                         <p className="truncate text-sm text-emerald-100/75">Equipe : {row.team.name}</p>
                                         <Link
                                             href={`/view-team?teamId=${row.team.id}&userId=${row.team.user_id}`}
