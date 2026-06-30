@@ -12,6 +12,7 @@ type RankingEntry = {
     totalPoints: number;
     wineName: string | null;
     isApproved: boolean;
+    isReceived: boolean;
 };
 
 function formatPronostiqueurName(firstName: string | null, lastName: string | null): string {
@@ -33,6 +34,33 @@ function formatPronostiqueurName(firstName: string | null, lastName: string | nu
     return "Joueur inconnu";
 }
 
+function getEntryStatusBadge(isApproved: boolean, isReceived: boolean): {label: string; bgColor: string; textColor: string; ringColor: string} {
+    if (isReceived) {
+        return {
+            label: "Reçue",
+            bgColor: "bg-blue-400/20",
+            textColor: "text-blue-200",
+            ringColor: "ring-blue-300/30",
+        };
+    }
+
+    if (isApproved) {
+        return {
+            label: "Validée",
+            bgColor: "bg-emerald-400/20",
+            textColor: "text-emerald-200",
+            ringColor: "ring-emerald-300/30",
+        };
+    }
+
+    return {
+        label: "En attente",
+        bgColor: "bg-amber-400/20",
+        textColor: "text-amber-200",
+        ringColor: "ring-amber-300/30",
+    };
+}
+
 export default async function RankingPage() {
     const supabase = await createClient();
     const {data: {user}} = await supabase.auth.getUser();
@@ -46,7 +74,7 @@ export default async function RankingPage() {
             user_id,
             total_points,
             profiles:user_id (first_name, last_name),
-            entries!entries_team_id_fkey (wine_name, is_approved)
+            entries!entries_team_id_fkey (wine_name, is_approved, is_received)
         `)
         .order("total_points", {ascending: false});
 
@@ -68,6 +96,7 @@ export default async function RankingPage() {
             totalPoints: row.total_points ?? 0,
             wineName: entry?.wine_name ?? null,
             isApproved: entry?.is_approved ?? false,
+            isReceived: entry?.is_received ?? false,
         };
     });
 
@@ -110,6 +139,7 @@ export default async function RankingPage() {
                                 "from-slate-300/20 border-slate-300/40",
                                 "from-orange-400/20 border-orange-400/40",
                             ];
+                            const statusBadge = getEntryStatusBadge(entry.isApproved, entry.isReceived);
                             return (
                                 <div
                                     key={entry.teamId}
@@ -142,7 +172,12 @@ export default async function RankingPage() {
                                         <span className="ml-1 text-base font-semibold text-yellow-200/70">pts</span>
                                     </p>
                                     {entry.wineName && (
-                                        <p className="mt-1 text-xs text-emerald-50/60 italic truncate">🍾 {entry.wineName}</p>
+                                        <>
+                                            <p className="mt-2 text-xs text-emerald-50/60 italic truncate">🍾 {entry.wineName}</p>
+                                            <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${statusBadge.bgColor} ${statusBadge.textColor} ring-1 ${statusBadge.ringColor}`}>
+                                                {statusBadge.label}
+                                            </span>
+                                        </>
                                     )}
                                 </div>
                             );
@@ -175,6 +210,7 @@ export default async function RankingPage() {
                             {rankings.map((entry, i) => {
                                 const isMe = entry.teamId === currentUserRank?.teamId;
                                 const isTop3 = entry.rank <= 3;
+                                const statusBadge = getEntryStatusBadge(entry.isApproved, entry.isReceived);
                                 return (
                                     <tr
                                         key={entry.teamId}
@@ -212,12 +248,9 @@ export default async function RankingPage() {
                                         </td>
                                         <td className="px-6 py-4 text-sm">
                                                 <span
-                                                    className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${entry.isApproved
-                                                        ? "bg-emerald-400/20 text-emerald-200 ring-1 ring-emerald-300/30"
-                                                        : "bg-amber-400/20 text-amber-200 ring-1 ring-amber-300/30"
-                                                    }`}
+                                                    className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${statusBadge.bgColor} ${statusBadge.textColor} ring-1 ${statusBadge.ringColor}`}
                                                 >
-                                                    {entry.isApproved ? "Validée" : "En attente"}
+                                                    {statusBadge.label}
                                                 </span>
                                         </td>
                                         <td className="px-6 py-4 text-emerald-50/60 text-sm italic">
@@ -241,6 +274,7 @@ export default async function RankingPage() {
                             {rankings.map((entry) => {
                                 const isMe = entry.teamId === currentUserRank?.teamId;
                                 const isTop3 = entry.rank <= 3;
+                                const statusBadge = getEntryStatusBadge(entry.isApproved, entry.isReceived);
                                 return (
                                     <li
                                         key={entry.teamId}
@@ -266,11 +300,8 @@ export default async function RankingPage() {
                                             >
                                                 {entry.teamName}
                                             </Link>
-                                            <p className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${entry.isApproved
-                                                ? "bg-emerald-400/20 text-emerald-200 ring-1 ring-emerald-300/30"
-                                                : "bg-amber-400/20 text-amber-200 ring-1 ring-amber-300/30"
-                                            }`}>
-                                                {entry.isApproved ? "Validée" : "En attente"}
+                                            <p className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${statusBadge.bgColor} ${statusBadge.textColor} ring-1 ${statusBadge.ringColor}`}>
+                                                {statusBadge.label}
                                             </p>
                                             {entry.wineName && (
                                                 <p className="text-xs text-emerald-50/50 italic truncate">🍾 {entry.wineName}</p>
