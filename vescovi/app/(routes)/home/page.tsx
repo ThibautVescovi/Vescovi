@@ -319,12 +319,12 @@ export default async function HomePage() {
                         </p>
 
                         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                            <Link
-                                href="/team"
-                                className="inline-flex items-center justify-center rounded-full border border-yellow-300 bg-yellow-300 px-6 py-3 text-sm font-black text-emerald-950 shadow-lg shadow-yellow-500/20 transition hover:-translate-y-0.5 hover:bg-yellow-200"
-                            >
-                                Créer mon équipe
-                            </Link>
+                            {/*<Link*/}
+                            {/*    href="/team"*/}
+                            {/*    className="inline-flex items-center justify-center rounded-full border border-yellow-300 bg-yellow-300 px-6 py-3 text-sm font-black text-emerald-950 shadow-lg shadow-yellow-500/20 transition hover:-translate-y-0.5 hover:bg-yellow-200"*/}
+                            {/*>*/}
+                            {/*    Créer mon équipe*/}
+                            {/*</Link>*/}
                             <Link
                                 href="/home#dernier-match"
                                 className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/10 px-6 py-3 text-sm font-bold text-white transition hover:-translate-y-0.5 hover:border-yellow-300/70 hover:bg-white/15"
