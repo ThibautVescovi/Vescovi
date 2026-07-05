@@ -1,45 +1,99 @@
 import Image from "next/image";
 import Link from "next/link";
 import HomeChat from "@/components/home-chat";
+import { createServiceRoleClient } from "@/lib/supabaseAdmin";
 import { createClient } from "@/lib/supabaseServer";
+import { isPreChangeStage, normalizePosition, type Position } from "@/lib/teamChanges";
 import type { HomeChatMessage } from "./actions";
 
-const today = new Intl.DateTimeFormat("fr-FR", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-}).format(new Date());
+type LatestMatch = {
+    id: string;
+    team_home: string;
+    team_away: string;
+    match_date: string | null;
+    stage: string | null;
+};
 
+type MatchPerformanceRow = {
+    player_id: string;
+    goals: number | null;
+    goals_conceded: number | null;
+    yellow_cards: number | null;
+    red_cards: number | null;
+    played_full_match: boolean | null;
+    is_starter: boolean | null;
+    is_substitute_in: boolean | null;
+};
 
-const news = [
-    {
-        id: 1,
-        tag: "A la une",
-        title: "Bienvenue sur Vescovi.fr",
-        content:
-            "Prépare ton onze idéal pour la coupe du monde 2026 et lance un concours de pronostics entre amis dans une ambiance conviviale, simple et pensée pour suivre chaque match.",
-        date: today,
-    },
-    {
-        id: 2,
-        tag: "Rappel",
-        title: "Compose une équipe qui respecte toutes les règles",
-        content:
-            "Ton onze doit contenir 1 gardien, 4 défenseurs, 3 milieux, 3 attaquants, au moins 5 nationalités et jamais plus de 3 joueurs d'un même pays.",
-        date: today,
-    },
-    {
-        id: 3,
-        tag: "Astuce",
-        title: "Pense déjà à la phase finale",
-        content:
-            "Deux changements seront possibles après les poules : anticipe dès maintenant les sélections les plus solides pour garder une longueur d'avance.",
-        date: today,
-    },
-];
+type TopMatchPlayer = {
+    name: string;
+    points: number;
+};
+
+type TeamChangeRow = {
+    team_id: string;
+    player_out_id: string | null;
+    player_in_id: string | null;
+};
+
+type TopMatchParticipant = {
+    teamId: string;
+    userId: string;
+    participantName: string;
+    teamName: string;
+    points: number;
+};
+
+const PLAYER_FETCH_CHUNK_SIZE = 200;
+
+function formatParticipantName(profile: { first_name: string | null; last_name: string | null } | null): string {
+    const firstName = profile?.first_name?.trim() ?? "";
+    const lastName = profile?.last_name?.trim() ?? "";
+
+    if (firstName && lastName) {
+        return `${firstName} ${lastName.charAt(0).toUpperCase()}.`;
+    }
+
+    if (firstName) {
+        return firstName;
+    }
+
+    if (lastName) {
+        return `${lastName.charAt(0).toUpperCase()}.`;
+    }
+
+    return "Joueur inconnu";
+}
+
+function computeMatchPoints(position: Position, row: MatchPerformanceRow): number {
+    const goals = Math.max(0, row.goals ?? 0);
+    const goalsConceded = Math.max(0, row.goals_conceded ?? 0);
+    const yellowCards = Math.max(0, row.yellow_cards ?? 0);
+    const redCards = Math.max(0, row.red_cards ?? 0);
+
+    const goalPoints = goals * 5;
+    const appearancePoints = row.played_full_match ? 2 : row.is_starter || row.is_substitute_in ? 1 : 0;
+    const hasPlayed = appearancePoints > 0;
+    const cardPoints = yellowCards * -2 + redCards * -5;
+
+    let defensivePoints = 0;
+    if (position === "Gardien") {
+        defensivePoints += hasPlayed && goalsConceded === 0 ? 5 : 0;
+        defensivePoints -= goalsConceded;
+    }
+
+    if (position === "Défenseur") {
+        defensivePoints += hasPlayed && goalsConceded === 0 ? 2 : 0;
+        defensivePoints -= goalsConceded;
+    }
+
+    return goalPoints + appearancePoints + cardPoints + defensivePoints;
+}
 
 export default async function HomePage() {
     const supabase = await createClient();
+    const serviceRoleClient = createServiceRoleClient();
+    const adminClient = serviceRoleClient ?? supabase;
     const {
         data: { user },
     } = await supabase.auth.getUser();
@@ -49,6 +103,198 @@ export default async function HomePage() {
         .select("id,user_id,author_name,content,created_at")
         .order("created_at", { ascending: false })
         .limit(40);
+
+    let latestMatchResult = await adminClient
+        .from("matches")
+        .select("id,team_home,team_away,match_date,stage")
+        .not("match_date", "is", null)
+        .order("match_date", { ascending: false })
+        .limit(1)
+        .maybeSingle<LatestMatch>();
+
+    if (latestMatchResult.error) {
+        latestMatchResult = await supabase
+            .from("matches")
+            .select("id,team_home,team_away,match_date,stage")
+            .not("match_date", "is", null)
+            .order("match_date", { ascending: false })
+            .limit(1)
+            .maybeSingle<LatestMatch>();
+        if (latestMatchResult.error) {
+            // no-op
+        }
+    }
+
+    const latestMatch = (latestMatchResult.data as LatestMatch | null) ?? null;
+    const latestMatchError: string | null = latestMatchResult.error?.message ?? null;
+    let countriesByCode = new Map<string, string>();
+    let topPlayers: TopMatchPlayer[] = [];
+    let topParticipants: TopMatchParticipant[] = [];
+    let topPlayerUnavailable = false;
+    let topParticipantUnavailable = false;
+
+    if (latestMatch) {
+        const { data: countriesData } = await supabase
+            .from("countries")
+            .select("code,name")
+            .in("code", [latestMatch.team_home, latestMatch.team_away]);
+
+        countriesByCode = new Map((countriesData ?? []).map((country) => [country.code, country.name]));
+
+        const { data: performancesData, error: performancesError } = await adminClient
+            .from("player_performances")
+            .select("player_id,goals,goals_conceded,yellow_cards,red_cards,played_full_match,is_starter,is_substitute_in")
+            .eq("match_id", latestMatch.id);
+
+        if (performancesError) {
+            topPlayerUnavailable = true;
+        }
+
+        const performanceRows = (performancesData ?? []) as MatchPerformanceRow[];
+        const pointsByPlayerId = new Map<string, number>();
+
+        if (performanceRows.length > 0) {
+            const playerIds = Array.from(new Set(performanceRows.map((row) => row.player_id)));
+            const playersData: Array<{ id: string; name: string; position: string }> = [];
+
+            for (let index = 0; index < playerIds.length; index += PLAYER_FETCH_CHUNK_SIZE) {
+                const chunk = playerIds.slice(index, index + PLAYER_FETCH_CHUNK_SIZE);
+                const { data: chunkData, error: chunkError } = await adminClient
+                    .from("players")
+                    .select("id,name,position")
+                    .in("id", chunk);
+
+                if (chunkError) {
+                    topPlayerUnavailable = true;
+                    break;
+                }
+
+                playersData.push(...(chunkData ?? []));
+            }
+
+            const playersById = new Map(playersData.map((player) => [player.id, player]));
+
+            const rankedPlayers = performanceRows
+                .map((row) => {
+                    const player = playersById.get(row.player_id);
+                    if (!player) {
+                        return null;
+                    }
+
+                    const position = normalizePosition(player.position);
+                    if (!position) {
+                        return null;
+                    }
+
+                    return {
+                        name: player.name,
+                        points: computeMatchPoints(position, row),
+                    };
+                })
+                .filter((row): row is TopMatchPlayer => row !== null)
+                .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name, "fr-FR"));
+
+            for (const row of performanceRows) {
+                const player = playersById.get(row.player_id);
+                if (!player) {
+                    continue;
+                }
+
+                const position = normalizePosition(player.position);
+                if (!position) {
+                    continue;
+                }
+
+                pointsByPlayerId.set(row.player_id, (pointsByPlayerId.get(row.player_id) ?? 0) + computeMatchPoints(position, row));
+            }
+
+            if (rankedPlayers.length > 0) {
+                const bestScore = rankedPlayers[0].points;
+                topPlayers = rankedPlayers.filter((player) => player.points === bestScore);
+            }
+        }
+
+        if (pointsByPlayerId.size > 0) {
+            const [teamsResult, activeTeamPlayersResult, teamChangesResult] = await Promise.all([
+                adminClient.from("teams").select("id,name,user_id"),
+                adminClient.from("team_players").select("team_id,player_id").eq("is_active", true),
+                adminClient.from("team_changes").select("team_id,player_out_id,player_in_id").order("created_at", { ascending: true }),
+            ]);
+
+            if (teamsResult.error || activeTeamPlayersResult.error || teamChangesResult.error) {
+                topParticipantUnavailable = true;
+            } else {
+                const teams = teamsResult.data ?? [];
+                const activeTeamPlayers = activeTeamPlayersResult.data ?? [];
+                const teamChanges = (teamChangesResult.data ?? []) as TeamChangeRow[];
+                const preChangeMatch = isPreChangeStage(latestMatch.stage);
+
+                const basePlayersByTeam = activeTeamPlayers.reduce<Record<string, string[]>>((acc, row) => {
+                    acc[row.team_id] = [...(acc[row.team_id] ?? []), row.player_id];
+                    return acc;
+                }, {});
+
+                const changesByTeam = teamChanges.reduce<Record<string, Array<{ player_out_id: string | null; player_in_id: string | null }>>>((acc, change) => {
+                    acc[change.team_id] = [
+                        ...(acc[change.team_id] ?? []),
+                        {
+                            player_out_id: change.player_out_id,
+                            player_in_id: change.player_in_id,
+                        },
+                    ];
+                    return acc;
+                }, {});
+
+                const userIds = Array.from(new Set(teams.map((team) => team.user_id)));
+                const { data: profilesData, error: profilesError } = userIds.length
+                    ? await adminClient.from("profiles").select("id,first_name,last_name").in("id", userIds)
+                    : { data: [], error: null };
+
+                if (profilesError) {
+                    topParticipantUnavailable = true;
+                }
+
+                const profilesById = new Map((profilesData ?? []).map((profile) => [profile.id, profile]));
+
+                const rankedParticipants = teams
+                    .map((team) => {
+                        const baseIds = basePlayersByTeam[team.id] ?? [];
+                        const effectiveIds = preChangeMatch
+                            ? baseIds
+                            : (() => {
+                                  const nextIds = new Set(baseIds);
+                                  for (const change of changesByTeam[team.id] ?? []) {
+                                      if (change.player_out_id) {
+                                          nextIds.delete(change.player_out_id);
+                                      }
+                                      if (change.player_in_id) {
+                                          nextIds.add(change.player_in_id);
+                                      }
+                                  }
+                                  return Array.from(nextIds);
+                              })();
+
+                        const points = effectiveIds.reduce((sum, playerId) => sum + (pointsByPlayerId.get(playerId) ?? 0), 0);
+
+                        return {
+                            teamId: team.id,
+                            userId: team.user_id,
+                            participantName: formatParticipantName(profilesById.get(team.user_id) ?? null),
+                            teamName: team.name,
+                            points,
+                        };
+                    })
+                    .sort((a, b) => b.points - a.points || a.participantName.localeCompare(b.participantName, "fr-FR"));
+
+                if (rankedParticipants.length > 0) {
+                    const bestScore = rankedParticipants[0].points;
+                    topParticipants = rankedParticipants.filter((participant) => participant.points === bestScore);
+                }
+            }
+        } else if (topPlayerUnavailable) {
+            topParticipantUnavailable = true;
+        }
+    }
 
     const initialMessages: HomeChatMessage[] = (messagesData ?? []).slice().reverse();
 
@@ -80,10 +326,10 @@ export default async function HomePage() {
                                 Créer mon équipe
                             </Link>
                             <Link
-                                href="/home#actualites"
+                                href="/home#dernier-match"
                                 className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/10 px-6 py-3 text-sm font-bold text-white transition hover:-translate-y-0.5 hover:border-yellow-300/70 hover:bg-white/15"
                             >
-                                Voir les actualités
+                                Voir le dernier match
                             </Link>
                         </div>
                     </div>
@@ -116,93 +362,156 @@ export default async function HomePage() {
                     </div>
                 </section>
 
+                <LatestMatchSection
+                    match={latestMatch}
+                    countriesByCode={countriesByCode}
+                    topPlayers={topPlayers}
+                    topParticipants={topParticipants}
+                    topPlayerUnavailable={topPlayerUnavailable}
+                    topParticipantUnavailable={topParticipantUnavailable}
+                    loadError={latestMatchError}
+                />
+
                 <HomeChat
                     initialMessages={initialMessages}
                     currentUserId={user?.id ?? null}
                     loadError={messagesError?.message ?? null}
                 />
 
-                <NewsSection />
-
             </main>
         </div>
     );
 }
 
-function NewsSection() {
-    const [featuredNews, ...secondaryNews] = news;
+function LatestMatchSection({
+    match,
+    countriesByCode,
+    topPlayers,
+    topParticipants,
+    topPlayerUnavailable,
+    topParticipantUnavailable,
+    loadError,
+}: {
+    match: LatestMatch | null;
+    countriesByCode: Map<string, string>;
+    topPlayers: TopMatchPlayer[];
+    topParticipants: TopMatchParticipant[];
+    topPlayerUnavailable: boolean;
+    topParticipantUnavailable: boolean;
+    loadError: string | null;
+}) {
+    const formattedDate = match?.match_date
+        ? new Intl.DateTimeFormat("fr-FR", {
+            day: "2-digit",
+            month: "long",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+        }).format(new Date(match.match_date))
+        : null;
+
+    const homeTeam = match ? countriesByCode.get(match.team_home) ?? match.team_home : null;
+    const awayTeam = match ? countriesByCode.get(match.team_away) ?? match.team_away : null;
 
     return (
-        <section id="actualites" className="scroll-mt-28">
+        <section id="dernier-match" className="scroll-mt-28">
             <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                     <p className="text-sm font-bold uppercase tracking-[0.24em] text-yellow-200">
-                        Actualités
+                        Classement
                     </p>
                     <h2 className="mt-2 text-3xl font-black text-white sm:text-4xl">
-                        Les infos à ne pas manquer
+                        Dernier match saisi
                     </h2>
                 </div>
                 <p className="max-w-xl text-sm leading-7 text-emerald-50/75">
-                    Retrouve ici les annonces importantes du concours, les rappels de règles et les bons réflexes pour préparer ton équipe.
+                    Cette section indique le match le plus recent enregistre pour verifier que le classement est bien a jour.
                 </p>
             </div>
 
-            <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
-                <article className="overflow-hidden rounded-[1.75rem] border border-yellow-300/30 bg-gradient-to-br from-yellow-300/15 via-white/10 to-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur">
-                    <div className="flex flex-wrap items-center gap-3 text-sm">
-                        <span className="rounded-full bg-yellow-300 px-3 py-1 font-black text-emerald-950">
-                            {featuredNews.tag}
-                        </span>
-                        <time className="text-emerald-50/70">{featuredNews.date}</time>
-                    </div>
-
-                    <h3 className="mt-5 text-2xl font-black text-white sm:text-3xl">
-                        {featuredNews.title}
-                    </h3>
-                    <p className="mt-4 max-w-2xl text-base leading-8 text-emerald-50/85">
-                        {featuredNews.content}
+            <article className="overflow-hidden rounded-[1.75rem] border border-yellow-300/30 bg-gradient-to-br from-yellow-300/15 via-white/10 to-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur">
+                {loadError ? (
+                    <p className="text-sm text-red-200">
+                        Impossible de charger le dernier match : {loadError}
                     </p>
+                ) : match ? (
+                    <>
+                        <div className="flex flex-wrap items-center gap-3 text-sm">
+                            <span className="rounded-full bg-yellow-300 px-3 py-1 font-black text-emerald-950">
+                                {match.stage ?? "Competition"}
+                            </span>
+                            {formattedDate ? <time className="text-emerald-50/70">{formattedDate}</time> : null}
+                        </div>
 
-                    <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                        <div className="rounded-2xl border border-white/10 bg-emerald-950/35 p-4">
-                            <p className="text-xs font-bold uppercase tracking-[0.2em] text-yellow-200">Format</p>
-                            <p className="mt-2 text-sm text-white/85">Un onze complet à composer pour viser la victoire.</p>
-                        </div>
-                        <div className="rounded-2xl border border-white/10 bg-emerald-950/35 p-4">
-                            <p className="text-xs font-bold uppercase tracking-[0.2em] text-yellow-200">Entre amis</p>
-                            <p className="mt-2 text-sm text-white/85">Un défi convivial à partager pendant tout le Mondial.</p>
-                        </div>
-                        <div className="rounded-2xl border border-white/10 bg-emerald-950/35 p-4">
-                            <p className="text-xs font-bold uppercase tracking-[0.2em] text-yellow-200">Stratégie</p>
-                            <p className="mt-2 text-sm text-white/85">Anticipe les changements et maximise chaque point.</p>
-                        </div>
-                    </div>
-                </article>
-
-                <div className="grid gap-5">
-                    {secondaryNews.map((item) => (
-                        <article
-                            key={item.id}
-                            className="rounded-[1.5rem] border border-white/10 bg-white/10 p-5 shadow-xl shadow-black/15 backdrop-blur transition hover:-translate-y-1 hover:border-yellow-300/40 hover:bg-white/12"
-                        >
-                            <div className="flex items-center justify-between gap-3">
-                                <span className="rounded-full border border-white/15 bg-emerald-950/40 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-yellow-200">
-                                    {item.tag}
+                        <h3 className="mt-5 text-2xl font-black text-white sm:text-3xl">
+                            {homeTeam} vs {awayTeam}
+                        </h3>
+                        {topPlayers.length > 0 ? (
+                            <p className="mt-4 text-base leading-8 text-emerald-50/85">
+                                {topPlayers.length > 1 ? "Meilleurs joueurs sur ce match : " : "Joueur le plus performant sur ce match : "}
+                                <span className="font-black text-yellow-200">
+                                    {topPlayers.map((player) => player.name).join(", ")}
                                 </span>
-                                <time className="text-xs text-emerald-50/65">{item.date}</time>
-                            </div>
-
-                            <h3 className="mt-4 text-xl font-black text-white">
-                                {item.title}
-                            </h3>
-                            <p className="mt-3 text-sm leading-7 text-emerald-50/80">
-                                {item.content}
+                                {" "}avec <span className="font-black text-yellow-200">{topPlayers[0].points} pts</span>.
                             </p>
-                        </article>
-                    ))}
-                </div>
-            </div>
+                        ) : topPlayerUnavailable ? (
+                            <p className="mt-4 text-base leading-8 text-emerald-50/85">
+                                Le meilleur joueur de ce match est temporairement indisponible.
+                            </p>
+                        ) : (
+                            <p className="mt-4 text-base leading-8 text-emerald-50/85">
+                                Aucun point joueur n&apos;a encore ete saisi pour ce match.
+                            </p>
+                        )}
+
+                        {topParticipants.length > 0 ? (
+                            <p className="mt-2 text-base leading-8 text-emerald-50/85">
+                                {topParticipants.length > 1 ? "Meilleurs participants sur ce match : " : "Meilleur participant sur ce match : "}
+                                <span className="font-black text-yellow-200">
+                                    {topParticipants.map((participant, index) => (
+                                        <span key={`${participant.teamId}-${participant.userId}`}>
+                                            {index > 0 ? ", " : ""}
+                                            <Link
+                                                href={`/view-team?teamId=${participant.teamId}&userId=${participant.userId}`}
+                                                className="underline underline-offset-2 transition hover:text-yellow-100"
+                                            >
+                                                {participant.participantName}
+                                            </Link>
+                                            {" "}(
+                                            <Link
+                                                href={`/view-team?teamId=${participant.teamId}&userId=${participant.userId}`}
+                                                className="underline underline-offset-2 transition hover:text-yellow-100"
+                                            >
+                                                {participant.teamName}
+                                            </Link>
+                                            )
+                                        </span>
+                                    ))}
+                                </span>
+                                {" "}avec <span className="font-black text-yellow-200">{topParticipants[0].points} pts</span>.
+                            </p>
+                        ) : topParticipantUnavailable ? (
+                            <p className="mt-2 text-base leading-8 text-emerald-50/85">
+                                Le meilleur participant de ce match est temporairement indisponible.
+                            </p>
+                        ) : (
+                            <p className="mt-2 text-base leading-8 text-emerald-50/85">
+                                Aucun participant ne peut encore etre classe sur ce match.
+                            </p>
+                        )}
+
+                        {topPlayerUnavailable || topParticipantUnavailable ? (
+                            <p className="mt-2 text-sm text-amber-100/90">
+                                Certaines statistiques du match sont temporairement indisponibles.
+                            </p>
+                        ) : null}
+                    </>
+                ) : (
+                    <p className="text-sm text-emerald-50/85">
+                        Aucun match avec une date valide n&apos;a encore ete saisi.
+                    </p>
+                )}
+            </article>
         </section>
     );
 }
