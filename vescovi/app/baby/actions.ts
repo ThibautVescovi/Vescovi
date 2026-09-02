@@ -31,7 +31,18 @@ export async function saveBaby(payload: SaveBabyPayload): Promise<SaveBabyResult
     return { ok: false, message: "Veuillez renseigner au moins un prénom, nom ou prénom prévu." };
   }
 
-  const { error } = await supabase.from("baby").insert({
+  // Use service role client if available to bypass RLS for public page inserts.
+  const serviceRoleKey = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const createSupabaseClient = (await import("@supabase/supabase-js")).createClient as typeof import("@supabase/supabase-js").createClient;
+
+  const adminClient =
+    serviceRoleKey && process.env.NEXT_PUBLIC_SUPABASE_URL
+      ? createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL, serviceRoleKey, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        })
+      : supabase;
+
+  const { error } = await adminClient.from("baby").insert({
     first_name,
     last_name,
     predicted_name,
