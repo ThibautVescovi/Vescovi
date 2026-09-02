@@ -2,6 +2,7 @@
 
 import React, { useState, useTransition } from "react";
 import { saveBaby, type SaveBabyPayload } from "./actions";
+import bg from './aa5589c7223e98b6b912b5994f2fb418.jpg';
 
 export default function BabyStandalonePage() {
   const [firstName, setFirstName] = useState("");
@@ -55,7 +56,13 @@ export default function BabyStandalonePage() {
   }
 
   return (
-    <div className="mx-auto w-full rounded-2xl bg-gradient-to-br from-white/6 via-white/4 to-white/2 p-8 backdrop-blur-md shadow-2xl border border-white/6">
+    <div
+      className="mx-auto w-full rounded-2xl p-8 backdrop-blur-md shadow-2xl border border-white/6 bg-cover bg-center"
+      style={{
+        backgroundImage: `linear-gradient(180deg, rgba(6,18,36,0.64) 0%, rgba(4,12,22,0.72) 100%), url(${bg.src})`,
+        backgroundBlendMode: 'overlay',
+      }}
+    >
       <div className="flex flex-col items-center text-center">
         <div className="mb-4 flex items-center gap-3">
           <svg width="56" height="56" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
