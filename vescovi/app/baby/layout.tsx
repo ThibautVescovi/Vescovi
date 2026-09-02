@@ -6,13 +6,10 @@ export const metadata = {
 
 export default function BabyLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr">
-      <head />
-      <body className="min-h-screen bg-gradient-to-b from-[#FFF8E6] via-[#FFFDF7] to-[#E8F6FF] text-slate-900">
-        <div className="flex min-h-screen items-center justify-center p-6">
-          <div className="w-full max-w-3xl">{children}</div>
-        </div>
-      </body>
-    </html>
+    <div className="min-h-screen bg-gradient-to-b from-[#FFF8E6] via-[#FFFDF7] to-[#E8F6FF] text-slate-900">
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <div className="w-full max-w-3xl">{children}</div>
+      </div>
+    </div>
   );
 }
