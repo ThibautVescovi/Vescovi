@@ -67,7 +67,7 @@ export default function BabyStandalonePage() {
           <h1 className="text-3xl font-serif font-extrabold text-white">Le Petit Prince</h1>
         </div>
 
-        <p className="mb-6 max-w-xl text-sm text-white/80">Un petit questionnaire pour deviner notre bébé. Aucun suivi, pas de login — juste une prédiction pour s'amuser ✨</p>
+        <p className="mb-6 max-w-xl text-sm text-white/80">Un petit questionnaire pour deviner notre bébé ✨</p>
       </div>
 
       {submitted ? (
@@ -122,10 +122,10 @@ export default function BabyStandalonePage() {
             <input
               type="number"
               min="0"
-              step="0.1"
+                          step="0.001"
               value={weight === "" ? "" : String(weight)}
               onChange={(e) => handleNumberChange(e, setWeight)}
-              placeholder="Ex. 3.2"
+                          placeholder="Ex. 3.452"
               className="mt-2 w-full rounded-md border border-white/10 bg-white/5 px-3 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-indigo-400"
             />
           </div>
@@ -170,8 +170,6 @@ export default function BabyStandalonePage() {
           </div>
         </form>
       )}
-
-      <p className="mt-6 text-center text-xs text-white/60 italic">Aucun suivi, aucune publicité. Juste un petit jeu pour la naissance.</p>
     </div>
   );
 }

@@ -36,8 +36,8 @@ export async function saveBaby(payload: SaveBabyPayload): Promise<SaveBabyResult
     last_name,
     predicted_name,
     predicted_date,
-    weight,
-    height,
+    predicted_weight: weight,
+    predicted_height: height,
   });
 
   if (error) {
