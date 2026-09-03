@@ -106,7 +106,7 @@ export default function BabyStandalonePage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">La date de naissance ? (Terme théorique le 27/10/2027)</label>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-700">La date de naissance ? (Terme théorique le 27/10/2026)</label>
             <input
               type="date"
               value={predictedDate}
