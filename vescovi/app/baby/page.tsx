@@ -185,7 +185,7 @@ export default function BabyStandalonePage() {
               href={birthListUrl}
               target="_blank"
               rel="noreferrer"
-              className="text-[11px] text-slate-500 underline decoration-slate-400 underline-offset-2 transition hover:text-slate-700"
+              className="text-[14px] text-slate-500 underline decoration-slate-400 underline-offset-2 transition hover:text-slate-700"
             >
               Consulter notre liste de naissance
             </a>
