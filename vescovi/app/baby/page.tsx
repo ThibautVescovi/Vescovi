@@ -13,6 +13,7 @@ export default function BabyStandalonePage() {
   const [status, setStatus] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const birthListUrl = "https://www.mesenvies.fr/liste-naissance?r=27&aid=2636957&lid=4756017#127624940";
 
   function handleNumberChange(e: React.ChangeEvent<HTMLInputElement>, setter: (v: number | "") => void) {
     const v = e.target.value;
@@ -72,6 +73,18 @@ export default function BabyStandalonePage() {
         <div className="mt-4 rounded-lg bg-[#F0FFF4] border border-slate-200 p-6 text-center">
           <p className="text-2xl font-semibold text-slate-900">Merci pour ta prédiction !</p>
           <p className="mt-2 text-sm text-slate-700">Ta prédiction a bien été enregistrée.</p>
+          <p className="mt-3 text-sm text-slate-700">
+            Tu peux aussi consulter notre{' '}
+            <a
+              href={birthListUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold underline decoration-2 underline-offset-2 text-slate-900 hover:text-slate-700"
+            >
+              liste de naissance
+            </a>
+            .
+          </p>
         </div>
       ) : (
         <form onSubmit={onSubmit} className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -165,6 +178,17 @@ export default function BabyStandalonePage() {
                 <p className={`text-sm ${submitted ? "text-emerald-700" : "text-rose-600"}`}>{status}</p>
               ) : null}
             </div>
+          </div>
+
+          <div className="sm:col-span-2 mt-1 text-center">
+            <a
+              href={birthListUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[11px] text-slate-500 underline decoration-slate-400 underline-offset-2 transition hover:text-slate-700"
+            >
+              Consulter notre liste de naissance
+            </a>
           </div>
         </form>
       )}
